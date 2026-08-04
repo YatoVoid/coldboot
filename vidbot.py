@@ -6,6 +6,8 @@
 import json, random, re, sqlite3, subprocess, sys, time
 from pathlib import Path
 
+import sources
+
 ROOT = Path(__file__).parent
 CFG = json.loads((ROOT / "config.json").read_text())
 OUT = ROOT / "out"
@@ -22,19 +24,14 @@ def db():
 
 # ---------------------------------------------------------------- sourcing
 def pick_stories(n):
-    """Front-page HN stories we haven't already used."""
-    import requests
-    q = "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=50"
-    hits = requests.get(q, timeout=30).json()["hits"]
+    """Stories from whichever source config.json names, minus ones already used."""
     con, out = db(), []
-    for h in hits:
-        url, title = h.get("url") or "", h.get("title") or ""
-        if not url or h.get("points", 0) < CFG["min_hn_points"]:
+    for s in sources.fetch(CFG["source"]):
+        if not s["url"] or not s["title"]:
             continue
-        if con.execute("SELECT 1 FROM seen WHERE url=?", (url,)).fetchone():
+        if con.execute("SELECT 1 FROM seen WHERE url=?", (s["url"],)).fetchone():
             continue
-        out.append({"title": title, "url": url, "points": h["points"],
-                    "id": h["objectID"]})
+        out.append(s)
         if len(out) >= n:
             break
     return out
@@ -240,7 +237,8 @@ def render(wav, ass, mp4):
           f"ass={ass.name}")
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", bed.name, "-i", wav.name,
                     "-vf", vf, "-map", "0:v", "-map", "1:a", "-shortest",
-                    "-c:v", CFG["encoder"], "-quality", "quality", "-b:v", "8M",
+                    "-c:v", CFG["encoder"], "-quality", "quality",
+                    "-b:v", CFG.get("bitrate", "8M"),
                     "-c:a", "aac", "-b:a", "192k", mp4.name],
                    check=True, cwd=str(OUT))
     return mp4
@@ -324,7 +322,7 @@ def main():
         if made >= want:
             break
         print(f"--- video {made + 1}/{want}  (candidate {i}/{len(stories)}) ---")
-        print(f"  [{s['points']}pts] {s['title']}", flush=True)
+        print(f"  [{s['score']}] {s['title']}", flush=True)
         try:
             mp4 = make_one(s)
             made += 1

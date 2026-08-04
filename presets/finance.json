@@ -1,0 +1,34 @@
+{
+  "niche": "business and markets explainers",
+  "audience": "working adults who follow money but are not traders",
+  "angle": "Explain the mechanism behind the headline. Never give investment advice, never predict prices, say plainly when something is unknowable.",
+
+  "source": {
+    "type": "rss",
+    "feeds": [
+      "https://feeds.marketwatch.com/marketwatch/topstories/",
+      "https://www.ft.com/rss/home",
+      "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"
+    ],
+    "limit": 40
+  },
+
+  "broll_queries": [
+    "stock market chart", "city skyline business", "shipping port containers",
+    "factory production line", "bank building", "trading floor",
+    "money counting", "warehouse logistics", "office meeting", "highway traffic"
+  ],
+  "broll_per_query": 4,
+
+  "model": "qwen3:8b",
+  "target_words": 1250,
+  "videos_per_run": 2,
+  "min_article_chars": 1200,
+
+  "width": 1920, "height": 1080, "fps": 30,
+  "font": "Arial", "bitrate": "8M", "encoder": "h264_amf",
+
+  "piper_voice": "en_US-ryan-high",
+  "whisper_model": "base.en",
+  "youtube_category": "25"
+}

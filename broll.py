@@ -11,10 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 BROLL = ROOT / "assets" / "broll"
 KEY = ROOT / "pexels.key"
-QUERIES = ["server room", "data center", "circuit board", "programming code",
-           "abstract technology", "city night timelapse", "robot arm",
-           "network cables", "artificial intelligence", "computer chip"]
-PER_QUERY = 4
+CFG = json.loads((ROOT / "config.json").read_text())
+QUERIES = CFG["broll_queries"]
+PER_QUERY = CFG.get("broll_per_query", 4)
 
 
 def best_file(files, max_w=1920):

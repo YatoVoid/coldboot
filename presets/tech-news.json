@@ -3,11 +3,7 @@
   "audience": "English-speaking US/UK tech-curious adults",
   "angle": "Explain what actually happened and why it matters, with a real opinion. Never hype, never listicle filler.",
 
-  "source": {
-    "type": "hackernews",
-    "min_points": 80,
-    "limit": 50
-  },
+  "source": { "type": "hackernews", "min_points": 80, "limit": 50 },
 
   "broll_queries": [
     "server room", "data center", "circuit board", "programming code",
@@ -18,15 +14,11 @@
 
   "model": "qwen3:8b",
   "target_words": 1250,
-  "videos_per_run": 6,
+  "videos_per_run": 2,
   "min_article_chars": 1200,
 
-  "width": 1920,
-  "height": 1080,
-  "fps": 30,
-  "font": "Arial",
-  "bitrate": "8M",
-  "encoder": "h264_amf",
+  "width": 1920, "height": 1080, "fps": 30,
+  "font": "Arial", "bitrate": "8M", "encoder": "h264_amf",
 
   "piper_voice": "en_US-ryan-high",
   "whisper_model": "base.en",

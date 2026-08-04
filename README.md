@@ -31,6 +31,7 @@ You'll also want a Pexels account and a YouTube channel. Both free.
 ```powershell
 git clone https://github.com/YatoVoid/coldboot.git
 cd coldboot
+python configure.py     # pick what the channel is about
 .\setup.ps1
 ```
 
@@ -94,19 +95,59 @@ The PC has to be awake. Task Scheduler won't wake it for you. While plugged in:
 powercfg /change standby-timeout-ac 0
 ```
 
-## Settings
+## Making it yours
 
-All in `config.json`.
+Nothing here is tied to tech. Run the wizard and pick a subject:
+
+```powershell
+python configure.py
+```
+
+It asks what the channel is about, who watches, how it should be written, which voice, and how many videos a night. Then it writes `config.json`.
+
+Presets to start from:
+
+| Preset | Subject | Stories from |
+|---|---|---|
+| `tech-news` | AI and technology | Hacker News |
+| `science` | research findings | phys.org, ScienceDaily, Quanta |
+| `space` | astronomy and missions | NASA, Space.com, SpaceNews |
+| `gaming` | game industry news | Eurogamer, RPS, PC Gamer |
+| `finance` | business and markets | MarketWatch, FT, Dow Jones |
+
+Load one directly with `python configure.py space`, list them with `--list`, check your config with `--check`.
+
+### Your own subject
+
+Point it at any RSS feed. Most news sites and blogs have one.
+
+```json
+"source": {
+  "type": "rss",
+  "feeds": ["https://example.com/feed", "https://another.com/rss"],
+  "limit": 40
+}
+```
+
+Three source types ship: `rss` (any feeds), `hackernews` (front page, filter with `min_points`), and `reddit` (`subreddits`, `period`). Reddit works through their RSS endpoint since the JSON API now needs OAuth, and it gets rate limited easily, so prefer `rss` when the subject has news sites covering it.
+
+To add a source they don't cover, write a function in `sources.py` that returns `{title, url, score}` and add it to `FETCHERS`. That's the whole interface.
+
+Change `broll_queries` to match the subject or your footage will not fit the words.
+
+### Everything else
 
 | Key | What it does |
 |---|---|
 | `videos_per_run` | Videos per night. Start at 1 or 2. |
 | `target_words` | 150 words is about a minute of speech |
-| `min_hn_points` | Higher means fewer, bigger stories |
 | `min_article_chars` | Under this, skip the story instead of guessing at it |
 | `model` | Any Ollama model. `qwen3:14b` if you have the RAM |
-| `niche`, `angle` | Change these. It's the only thing stopping you being a clone |
+| `niche`, `angle` | What the writing sounds like. Worth real thought |
+| `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
+| `bitrate` | `8M` looks good, `5M` halves upload size for no visible loss |
 | `encoder` | `h264_amf` for AMD, `h264_nvenc` for NVIDIA, `libx264` for CPU |
+| `youtube_category` | 28 science/tech, 20 gaming, 25 news, 27 education |
 
 YouTube allows 6 uploads a day per project. Each costs 1,600 of a 10,000 daily quota. `upload.py` won't go over.
 
@@ -114,7 +155,8 @@ YouTube allows 6 uploads a day per project. Each costs 1,600 of a 10,000 daily q
 
 ```
 broll.py    Pexels          -> assets/broll/*.mp4
-vidbot.py   Hacker News     -> story, deduped against state.db
+sources.py  rss/hn/reddit   -> candidate stories
+vidbot.py   pick one        -> deduped against state.db
             article fetch   -> real text, not just a headline
             Ollama          -> narration
             Piper           -> wav
@@ -126,9 +168,17 @@ upload.py   YouTube API     -> uploaded private, logged
 Each script self-tests without network, keys or models:
 
 ```powershell
-python vidbot.py --demo
-python broll.py  --demo
-python upload.py --demo
+python vidbot.py    --demo
+python sources.py   --demo
+python configure.py --demo
+python broll.py     --demo
+python upload.py    --demo
+```
+
+To see what your source would pick up today, without making anything:
+
+```powershell
+python sources.py
 ```
 
 ## Keys

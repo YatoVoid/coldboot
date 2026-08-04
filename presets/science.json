@@ -1,0 +1,34 @@
+{
+  "niche": "science and research explainers",
+  "audience": "curious adults with no specialist training",
+  "angle": "Take one new finding and explain what was measured, how, and what it does not prove. Respect the uncertainty instead of overselling.",
+
+  "source": {
+    "type": "rss",
+    "feeds": [
+      "https://phys.org/rss-feed/",
+      "https://www.sciencedaily.com/rss/top/science.xml",
+      "https://www.quantamagazine.org/feed/"
+    ],
+    "limit": 40
+  },
+
+  "broll_queries": [
+    "laboratory research", "microscope", "dna helix", "particle physics",
+    "telescope night sky", "chemistry glassware", "scientist working",
+    "petri dish", "brain scan", "ocean underwater"
+  ],
+  "broll_per_query": 4,
+
+  "model": "qwen3:8b",
+  "target_words": 1250,
+  "videos_per_run": 2,
+  "min_article_chars": 1200,
+
+  "width": 1920, "height": 1080, "fps": 30,
+  "font": "Arial", "bitrate": "8M", "encoder": "h264_amf",
+
+  "piper_voice": "en_US-ryan-high",
+  "whisper_model": "base.en",
+  "youtube_category": "28"
+}

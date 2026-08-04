@@ -1,0 +1,34 @@
+{
+  "niche": "space and astronomy",
+  "audience": "people who like space but are not astronomers",
+  "angle": "Explain the mission or the discovery plainly, including the parts that went wrong or are still unknown.",
+
+  "source": {
+    "type": "rss",
+    "feeds": [
+      "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+      "https://www.space.com/feeds/all",
+      "https://spacenews.com/feed/"
+    ],
+    "limit": 40
+  },
+
+  "broll_queries": [
+    "space stars", "galaxy nebula", "rocket launch", "earth from space",
+    "satellite orbit", "moon surface", "observatory telescope",
+    "mars landscape", "astronaut", "milky way timelapse"
+  ],
+  "broll_per_query": 4,
+
+  "model": "qwen3:8b",
+  "target_words": 1250,
+  "videos_per_run": 2,
+  "min_article_chars": 1200,
+
+  "width": 1920, "height": 1080, "fps": 30,
+  "font": "Arial", "bitrate": "8M", "encoder": "h264_amf",
+
+  "piper_voice": "en_US-ryan-high",
+  "whisper_model": "base.en",
+  "youtube_category": "28"
+}

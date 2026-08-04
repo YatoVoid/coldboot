@@ -55,8 +55,9 @@ def service():
 def upload_one(yt, mp4):
     from googleapiclient.http import MediaFileUpload
     meta = json.loads(mp4.with_suffix(".json").read_text(encoding="utf-8"))
+    cfg = json.loads((ROOT / "config.json").read_text())
     body = {"snippet": {"title": meta["title"], "description": meta["description"],
-                        "categoryId": "28"},                    # 28 = Science & Technology
+                        "categoryId": cfg.get("youtube_category", "28")},
             "status": {"privacyStatus": PRIVACY, "selfDeclaredMadeForKids": False}}
     req = yt.videos().insert(part="snippet,status", body=body,
                              media_body=MediaFileUpload(str(mp4), chunksize=-1, resumable=True))

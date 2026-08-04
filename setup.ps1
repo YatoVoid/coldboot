@@ -9,8 +9,9 @@ param([switch]$Check)
 $ErrorActionPreference = "Stop"
 $root  = $PSScriptRoot
 $piper = Join-Path $root "assets\piper"
-$voice = "en_US-ryan-high"
-$model = "qwen3:8b"
+$cfg   = Get-Content (Join-Path $root "config.json") -Raw | ConvertFrom-Json
+$voice = $cfg.piper_voice
+$model = $cfg.model
 $step  = 0
 $total = 8
 $fail  = @()
@@ -100,8 +101,12 @@ else {
   OK "piper unpacked"
 }
 
-Step "Downloading the voice model"
-$base = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/high/$voice.onnx"
+Step "Downloading the voice model ($voice)"
+# en_US-ryan-high  ->  en/en_US/ryan/high/en_US-ryan-high.onnx
+$parts = $voice.Split("-")
+$lang, $speaker, $quality = $parts[0], $parts[1], $parts[2]
+$family = $lang.Split("_")[0]
+$base = "https://huggingface.co/rhasspy/piper-voices/resolve/main/$family/$lang/$speaker/$quality/$voice.onnx"
 foreach ($ext in @("", ".json")) {
   $dest = Join-Path $piper "$voice.onnx$ext"
   if (Test-Path $dest) { Skip "$voice.onnx$ext" }
