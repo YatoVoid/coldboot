@@ -3,7 +3,7 @@
     python vidbot.py          make today's videos
     python vidbot.py --demo   self-check, no network needed
 """
-import json, re, sqlite3, subprocess, sys, time
+import json, random, re, sqlite3, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -198,23 +198,32 @@ def duration(path):
     return float(o.stdout.strip())
 
 
-def build_bed(seconds, out_path):
-    """Loop the b-roll folder until it's longer than the narration.
+def clip_order(clips, seconds, seed, dur):
+    """Shuffled clip list, long enough to cover the narration.
 
-    Clips play in name order and repeat. Fine at first, gets obvious once the
-    videos run long, so keep the library growing.
+    Seeded off the video name so a rerun of the same video is identical but two
+    different videos never open on the same shot. Reshuffled every pass so the
+    repeats don't fall into a visible loop either.
     """
+    rng = random.Random(seed)
+    total, out = 0.0, []
+    while total < seconds + 5:
+        cycle = clips[:]
+        rng.shuffle(cycle)
+        for c in cycle:
+            out.append(c)
+            total += dur(c)
+            if total >= seconds + 5:
+                break
+    return out
+
+
+def build_bed(seconds, out_path, seed=""):
     clips = sorted([p for p in BROLL.glob("*") if p.suffix.lower() in (".mp4", ".mov", ".webm")])
     if not clips:
         sys.exit(f"No b-roll. Drop stock clips into {BROLL}")
     lst = ROOT / "_concat.txt"
-    total, entries = 0.0, []
-    while total < seconds + 5:
-        for c in clips:
-            entries.append(f"file '{c.as_posix()}'")
-            total += duration(c)
-            if total >= seconds + 5:
-                break
+    entries = [f"file '{c.as_posix()}'" for c in clip_order(clips, seconds, seed, duration)]
     lst.write_text("\n".join(entries), encoding="utf-8")
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
                     "-an", "-c", "copy", str(out_path)], check=True)
@@ -223,7 +232,7 @@ def build_bed(seconds, out_path):
 
 def render(wav, ass, mp4):
     secs = duration(wav)
-    bed = build_bed(secs, OUT / "_bed.mp4")
+    bed = build_bed(secs, OUT / "_bed.mp4", seed=mp4.stem)
     # cwd=OUT so the ass filter gets a bare filename. ffmpeg reads the colon in
     # C:/... as a filter option separator and mangles the path.
     vf = (f"scale={CFG['width']}:{CFG['height']}:force_original_aspect_ratio=increase,"
@@ -286,6 +295,15 @@ def demo():
     with mk.patch("requests.get", return_value=resp):
         got = fetch_article("http://x")
     assert "junk" not in got and "Real text here." in got, got
+
+    # videos must not all open on the same shot, but a rerun must be identical.
+    # Two seeds can collide by chance, so check the spread over several.
+    clips, d = [Path(f"{i}.mp4") for i in range(8)], lambda p: 10.0
+    opens = {clip_order(clips, 60, f"story-{i}", d)[0] for i in range(6)}
+    assert len(opens) > 1, "every video opened on the same clip"
+    a = clip_order(clips, 60, "story-0", d)
+    assert a == clip_order(clips, 60, "story-0", d), "not reproducible"
+    assert len(a) * 10 >= 60, "bed too short to cover the narration"
     print("demo ok")
 
 
