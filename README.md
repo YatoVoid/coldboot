@@ -86,9 +86,15 @@ The normalise step matters. Clips arrive at assorted resolutions and frame rates
 1. Make the channel.
 2. At <https://console.cloud.google.com>, create a project.
 3. APIs & Services, Library, find YouTube Data API v3, enable it.
-4. APIs & Services, OAuth consent screen, External, fill in what it asks, then add your own Google account under Test users.
-5. Credentials, Create credentials, OAuth client ID, Desktop app, download the JSON.
-6. Save it here as `client_secret.json`.
+4. APIs & Services, OAuth consent screen, External, fill in what it asks.
+5. Under Audience, add the Google account that owns the channel to Test users. Miss this and sign-in fails with `Error 403: access_denied`.
+6. Still under Audience, press Publish app so the status is In production, not Testing. See below for why.
+7. Credentials, Create credentials, OAuth client ID, Desktop app, download the JSON.
+8. Save it here as `client_secret.json`.
+
+Google will call the app unverified when you sign in. That is expected for a personal app. Click Advanced, then the "go to (unsafe)" link. It is your app talking to your own channel.
+
+**Publish the app, do not leave it in Testing.** While the status is Testing, Google expires the refresh token after 7 days, so a nightly upload works for a week and then quietly stops until you sign in again. Publishing does not require Google verification. Verification only controls whether strangers see the warning screen, and an unverified production app still works for up to 100 users.
 
 ### Run
 
@@ -238,7 +244,8 @@ Watch your own videos before making them public. The model is told not to invent
 | `bad interpreter: ^M` | The .sh got CRLF endings. `sed -i 's/\r$//' *.sh` |
 | `externally-managed-environment` | Debian/Ubuntu pip guard. setup.sh retries with `--break-system-packages`, or use a venv |
 | No captions on Linux | Install fonts: `sudo apt install fonts-dejavu` |
-| Upload 403 | Add your account under Test users on the consent screen |
+| `403: access_denied` at sign-in | Your account is not in Test users, see step 5 |
+| Uploads stop after about a week | App still in Testing, publish it, see step 6 |
 | `quotaExceeded` | 6 uploads a day, that's the ceiling |
 | Nothing ran overnight | Machine was asleep |
 

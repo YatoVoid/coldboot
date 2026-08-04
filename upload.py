@@ -47,6 +47,10 @@ def service():
         else:
             if not sec.exists():
                 sys.exit(f"Missing {sec}. Create an OAuth Desktop client in Google Cloud.")
+            print("A browser will open to authorise this app.")
+            print("If you get 'Error 403: access_denied', the signing-in account")
+            print("is not listed under Test users on the OAuth consent screen.")
+            print("Also set the app to In production, or the login expires weekly.\n")
             flow = InstalledAppFlow.from_client_secrets_file(str(sec), SCOPES)
             # a server with no desktop has nothing to open, so print the url and
             # let them forward the port or paste it into a browser elsewhere
