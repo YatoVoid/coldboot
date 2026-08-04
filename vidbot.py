@@ -3,17 +3,70 @@
     python vidbot.py          make today's videos
     python vidbot.py --demo   self-check, no network needed
 """
-import json, random, re, sqlite3, subprocess, sys, time
+import json, os, random, re, sqlite3, subprocess, sys, time
 from pathlib import Path
 
 import sources
 
 ROOT = Path(__file__).parent
-CFG = json.loads((ROOT / "config.json").read_text())
+# utf-8-sig so a config saved by notepad or powershell keeps working
+CFG = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
 OUT = ROOT / "out"
 ASSETS = ROOT / "assets"
 BROLL = ASSETS / "broll"
-PIPER = ASSETS / "piper" / "piper.exe"
+WINDOWS = sys.platform == "win32"
+PIPER = ASSETS / "piper" / ("piper.exe" if WINDOWS else "piper")
+
+# hardware encoders we'd rather have, best first. amf is amd, nvenc nvidia,
+# qsv intel. libx264 is cpu and works everywhere. vaapi is deliberately left
+# out, it needs device setup and format juggling that isn't worth it here.
+# each wants its own speed/quality flag, hence the second table.
+ENCODERS = ["h264_nvenc", "h264_amf", "h264_qsv", "libx264"]
+ENC_ARGS = {"h264_nvenc": ["-preset", "p5"],
+            "h264_amf": ["-quality", "quality"],
+            "h264_qsv": ["-preset", "medium"],
+            "libx264": ["-preset", "medium"]}
+
+
+_ENCODER = None
+
+
+def encoder_works(name):
+    """Encode a couple of frames for real.
+
+    Listing an encoder proves nothing. Most ffmpeg builds ship nvenc, amf and
+    qsv compiled in whatever gpu you have, and they only fail when you use them.
+    """
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+             "-i", "testsrc=size=320x240:rate=5:duration=0.4",
+             "-c:v", name, *ENC_ARGS.get(name, []), "-f", "null", "-"],
+            capture_output=True, timeout=60)
+    except FileNotFoundError:
+        sys.exit("ffmpeg is not on PATH. Run setup, then reopen your terminal.")
+    except subprocess.TimeoutExpired:
+        return False
+    return r.returncode == 0
+
+
+def pick_encoder():
+    """First encoder this machine can actually use. Probed once per run."""
+    global _ENCODER
+    want = CFG.get("encoder", "auto")
+    if want != "auto":
+        return want
+    if _ENCODER is None:
+        _ENCODER = next((e for e in ENCODERS if encoder_works(e)), "libx264")
+    return _ENCODER
+
+
+def pick_font():
+    """Arial does not exist on most Linux boxes, DejaVu does not ship on Windows."""
+    want = CFG.get("font", "auto")
+    if want != "auto":
+        return want
+    return "Arial" if WINDOWS else "DejaVu Sans"
 
 
 def db():
@@ -148,8 +201,12 @@ def narrate(text, wav):
     if not PIPER.exists():
         sys.exit(f"Piper missing. Run setup.ps1 first. Expected {PIPER}")
     voice = ASSETS / "piper" / f"{CFG['piper_voice']}.onnx"
+    env = None
+    if not WINDOWS:
+        # the linux build ships its own .so files next to the binary
+        env = dict(os.environ, LD_LIBRARY_PATH=str(PIPER.parent))
     subprocess.run([str(PIPER), "-m", str(voice), "-f", str(wav), "--sentence-silence", "0.35"],
-                   input=text.encode("utf-8"), check=True)
+                   input=text.encode("utf-8"), check=True, env=env)
     return wav
 
 
@@ -174,7 +231,7 @@ PlayResY: {CFG['height']}
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,OutlineColour,BackColour,Bold,BorderStyle,Outline,Shadow,Alignment,MarginV,Encoding
-Style: D,{CFG['font']},84,&H00FFFFFF,&H00000000,&H80000000,-1,1,5,2,2,120,1
+Style: D,{pick_font()},84,&H00FFFFFF,&H00000000,&H80000000,-1,1,5,2,2,120,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
@@ -235,9 +292,10 @@ def render(wav, ass, mp4):
     vf = (f"scale={CFG['width']}:{CFG['height']}:force_original_aspect_ratio=increase,"
           f"crop={CFG['width']}:{CFG['height']},fps={CFG['fps']},"
           f"ass={ass.name}")
+    enc = pick_encoder()
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", bed.name, "-i", wav.name,
                     "-vf", vf, "-map", "0:v", "-map", "1:a", "-shortest",
-                    "-c:v", CFG["encoder"], "-quality", "quality",
+                    "-c:v", enc, *ENC_ARGS.get(enc, []),
                     "-b:v", CFG.get("bitrate", "8M"),
                     "-c:a", "aac", "-b:a", "192k", mp4.name],
                    check=True, cwd=str(OUT))

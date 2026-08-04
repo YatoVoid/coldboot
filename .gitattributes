@@ -1,0 +1,6 @@
+# shell scripts must stay LF or linux gets "bad interpreter: /usr/bin/env^M"
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.py text
+*.md text
+*.json text

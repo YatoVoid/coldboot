@@ -58,14 +58,14 @@ def wizard():
     names = presets()
     print("\nWhat should this channel be about?\n")
     for i, n in enumerate(names, 1):
-        cfg = json.loads((PRESETS / f"{n}.json").read_text())
+        cfg = json.loads((PRESETS / f"{n}.json").read_text(encoding="utf-8-sig"))
         print(f"  {i}. {n:<14} {cfg['niche']}")
     print(f"  {len(names) + 1}. custom        start from tech-news and edit it\n")
 
     pick = input(f"choose 1-{len(names) + 1}: ").strip()
     custom = pick == str(len(names) + 1)
     base = "tech-news" if custom else names[int(pick) - 1]
-    cfg = json.loads((PRESETS / f"{base}.json").read_text())
+    cfg = json.loads((PRESETS / f"{base}.json").read_text(encoding="utf-8-sig"))
 
     if custom:
         print("\nDescribe it. Press enter to keep what's shown.\n")
@@ -95,15 +95,16 @@ def wizard():
 
     CONFIG.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
     print(f"\nwrote config.json ({cfg['niche']}, {cfg['piper_voice']})")
-    print("next: .\\setup.ps1   then   python broll.py")
+    print("next: .\\setup.ps1" if sys.platform == "win32" else "next: ./setup.sh")
+    print("then: python broll.py")
     return 0
 
 
 def demo():
-    good = json.loads((PRESETS / "tech-news.json").read_text())
+    good = json.loads((PRESETS / "tech-news.json").read_text(encoding="utf-8-sig"))
     assert validate(good) == [], validate(good)
     for name in presets():
-        cfg = json.loads((PRESETS / f"{name}.json").read_text())
+        cfg = json.loads((PRESETS / f"{name}.json").read_text(encoding="utf-8-sig"))
         assert validate(cfg) == [], f"{name}: {validate(cfg)}"
     assert validate({}), "empty config should not pass"
     bad = dict(good, source={"type": "rss", "feeds": []})
@@ -119,16 +120,17 @@ if __name__ == "__main__":
         demo()
     elif "--list" in a:
         for n in presets():
-            print(f"{n:<14} {json.loads((PRESETS / f'{n}.json').read_text())['niche']}")
+            cfg = json.loads((PRESETS / f"{n}.json").read_text(encoding="utf-8-sig"))
+            print(f"{n:<14} {cfg['niche']}")
     elif "--check" in a:
-        problems = validate(json.loads(CONFIG.read_text()))
+        problems = validate(json.loads(CONFIG.read_text(encoding="utf-8-sig")))
         print("\n".join(f"  - {p}" for p in problems) if problems else "config ok")
         sys.exit(1 if problems else 0)
     elif a and not a[0].startswith("-"):
         src = PRESETS / f"{a[0]}.json"
         if not src.exists():
             sys.exit(f"no preset {a[0]!r}. options: {', '.join(presets())}")
-        CONFIG.write_text(src.read_text(), encoding="utf-8")
+        CONFIG.write_text(src.read_text(encoding="utf-8-sig"), encoding="utf-8")
         print(f"loaded preset {a[0]}")
     else:
         sys.exit(wizard())

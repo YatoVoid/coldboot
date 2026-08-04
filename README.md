@@ -18,7 +18,9 @@ Want money this month? Wrong tool.
 
 ## Requirements
 
-Windows 10 or 11, about 15 GB of disk, 16 GB of RAM (8 works, slower), and Python 3.10+ from [python.org](https://python.org) with "Add to PATH" ticked.
+Windows 10/11, or Linux (Debian, Ubuntu, Fedora, Arch, openSUSE, Alpine). About 15 GB of disk, 16 GB of RAM (8 works, slower), Python 3.10+.
+
+On Windows get Python from [python.org](https://python.org) with "Add to PATH" ticked. On Linux it is almost certainly already installed.
 
 A GPU is nice but not needed. On a Ryzen 9 8945HS laptop with no dedicated GPU it takes about 11 minutes per video.
 
@@ -28,22 +30,31 @@ You'll also want a Pexels account and a YouTube channel. Both free.
 
 ### Install everything
 
+Windows:
+
 ```powershell
 git clone https://github.com/YatoVoid/coldboot.git
 cd coldboot
-python configure.py     # pick what the channel is about
+python configure.py
 .\setup.ps1
 ```
 
-That pulls ffmpeg, Ollama, the Python packages, Piper, a voice model, and the LLM. It prints what it's doing, skips whatever is already there, and you can re-run it if it dies partway.
+Linux:
+
+```bash
+git clone https://github.com/YatoVoid/coldboot.git
+cd coldboot
+python3 configure.py
+./setup.sh
+```
+
+Either one pulls ffmpeg, Ollama, the Python packages, Piper, a voice model, and the LLM. Both print what they're doing, skip whatever is already installed, and can be re-run if they die partway.
 
 First run downloads about 7 GB. Give it 15 to 40 minutes. The model pull shows its own progress bar.
 
-To check the install without changing anything:
+To check the install without changing anything, use `.\setup.ps1 -Check` or `./setup.sh --check`.
 
-```powershell
-.\setup.ps1 -Check
-```
+The Linux script picks the right package manager for apt, dnf, pacman, zypper and apk, and grabs the matching Piper build for x86_64, aarch64 or armv7l. It will ask for sudo when it installs ffmpeg.
 
 ### Pexels key
 
@@ -72,15 +83,21 @@ About 40 clips, all CC0. It runs again every night so the library keeps growing 
 
 ### Run
 
-```powershell
-.\run_daily.ps1
-```
+`.\run_daily.ps1` on Windows, `./run_daily.sh` on Linux.
 
 Footage, then videos, then upload. A browser opens once to authorise. After that it never asks again.
+
+On a headless server there is no browser to open, so it prints the URL instead. Forward the port from your own machine first:
+
+```bash
+ssh -L 8080:localhost:8080 user@thatbox
+```
 
 Uploads are set to private. Go watch them. When you're happy, change `PRIVACY` to `"public"` in `upload.py`.
 
 ### Nightly
+
+Windows:
 
 ```powershell
 $a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$PWD\run_daily.ps1`""
@@ -89,11 +106,15 @@ $s = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -
 Register-ScheduledTask -TaskName "coldboot-daily" -Action $a -Trigger $t -Settings $s -Force
 ```
 
-The PC has to be awake. Task Scheduler won't wake it for you. While plugged in:
+The PC has to be awake. Task Scheduler won't wake it. While plugged in: `powercfg /change standby-timeout-ac 0`.
 
-```powershell
-powercfg /change standby-timeout-ac 0
+Linux, add to `crontab -e`:
+
 ```
+0 2 * * * /full/path/to/coldboot/run_daily.sh >> /full/path/to/coldboot/logs/cron.log 2>&1
+```
+
+Cron gets a bare PATH, so if ollama or ffmpeg are somewhere unusual, set `PATH=` at the top of the crontab. A laptop that suspends will skip the run, same as Windows.
 
 ## Making it yours
 
@@ -146,7 +167,8 @@ Change `broll_queries` to match the subject or your footage will not fit the wor
 | `niche`, `angle` | What the writing sounds like. Worth real thought |
 | `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
 | `bitrate` | `8M` looks good, `5M` halves upload size for no visible loss |
-| `encoder` | `h264_amf` for AMD, `h264_nvenc` for NVIDIA, `libx264` for CPU |
+| `encoder` | `auto` probes ffmpeg. Force it with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
+| `font` | `auto` means Arial on Windows, DejaVu Sans on Linux |
 | `youtube_category` | 28 science/tech, 20 gaming, 25 news, 27 education |
 
 YouTube allows 6 uploads a day per project. Each costs 1,600 of a 10,000 daily quota. `upload.py` won't go over.
@@ -203,7 +225,10 @@ Watch your own videos before making them public. The model is told not to invent
 |---|---|
 | `No b-roll` | Run `python broll.py`. Needs `pexels.key`. |
 | Script step takes 6+ minutes | Normal on CPU. Use a smaller model. |
-| `ffmpeg not recognised` | Reopen PowerShell so PATH refreshes |
+| `ffmpeg not recognised` | Reopen the terminal so PATH refreshes |
+| `bad interpreter: ^M` | The .sh got CRLF endings. `sed -i 's/\r$//' *.sh` |
+| `externally-managed-environment` | Debian/Ubuntu pip guard. setup.sh retries with `--break-system-packages`, or use a venv |
+| No captions on Linux | Install fonts: `sudo apt install fonts-dejavu` |
 | Upload 403 | Add your account under Test users on the consent screen |
 | `quotaExceeded` | 6 uploads a day, that's the ceiling |
 | Nothing ran overnight | Machine was asleep |

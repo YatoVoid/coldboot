@@ -5,7 +5,7 @@ Run: python upload.py           (upload everything unpublished, up to the cap)
 First run opens a browser once to authorise, then stores token.json.
 Needs client_secret.json from Google Cloud (YouTube Data API v3, OAuth Desktop app).
 """
-import json, sqlite3, sys, time
+import json, os, sqlite3, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).parent
@@ -47,7 +47,17 @@ def service():
         else:
             if not sec.exists():
                 sys.exit(f"Missing {sec}. Create an OAuth Desktop client in Google Cloud.")
-            creds = InstalledAppFlow.from_client_secrets_file(str(sec), SCOPES).run_local_server(port=0)
+            flow = InstalledAppFlow.from_client_secrets_file(str(sec), SCOPES)
+            # a server with no desktop has nothing to open, so print the url and
+            # let them forward the port or paste it into a browser elsewhere
+            headless = sys.platform != "win32" and not os.environ.get("DISPLAY")
+            if headless:
+                print("No display detected. Open the link below in any browser.")
+                print("If this box is remote, forward the port first:")
+                print("  ssh -L 8080:localhost:8080 user@thisbox\n")
+                creds = flow.run_local_server(port=8080, open_browser=False)
+            else:
+                creds = flow.run_local_server(port=0)
         tok.write_text(creds.to_json())
     return build("youtube", "v3", credentials=creds)
 
@@ -55,7 +65,7 @@ def service():
 def upload_one(yt, mp4):
     from googleapiclient.http import MediaFileUpload
     meta = json.loads(mp4.with_suffix(".json").read_text(encoding="utf-8"))
-    cfg = json.loads((ROOT / "config.json").read_text())
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
     body = {"snippet": {"title": meta["title"], "description": meta["description"],
                         "categoryId": cfg.get("youtube_category", "28")},
             "status": {"privacyStatus": PRIVACY, "selfDeclaredMadeForKids": False}}

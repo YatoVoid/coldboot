@@ -158,6 +158,6 @@ if __name__ == "__main__":
     if "--demo" in sys.argv:
         demo()
     else:
-        cfg = json.loads((Path(__file__).parent / "config.json").read_text())
+        cfg = json.loads((Path(__file__).parent / "config.json").read_text(encoding="utf-8-sig"))
         for s in fetch(cfg["source"]):
             print(f"{s['score']:>6}  {s['title'][:70]}")

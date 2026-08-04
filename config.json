@@ -24,9 +24,9 @@
   "width": 1920,
   "height": 1080,
   "fps": 30,
-  "font": "Arial",
+  "font": "auto",
   "bitrate": "8M",
-  "encoder": "h264_amf",
+  "encoder": "auto",
 
   "piper_voice": "en_US-ryan-high",
   "whisper_model": "base.en",
