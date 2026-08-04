@@ -65,6 +65,30 @@ def next_page():
     return p
 
 
+def normalize(path):
+    """Re-encode to one common format.
+
+    Stock clips arrive at assorted resolutions and frame rates. Concatenating
+    those with -c copy produces a file whose duration is wrong, and the render
+    then cuts the narration off to match it. Paying for one encode here means
+    every later concat is exact.
+    """
+    tmp = path.with_suffix(".norm.mp4")
+    w, h, fps = CFG.get("width", 1920), CFG.get("height", 1080), CFG.get("fps", 30)
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", str(path), "-an",
+         "-vf", f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+                f"crop={w}:{h},fps={fps},format=yuv420p",
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(tmp)],
+        capture_output=True)
+    if r.returncode != 0 or not tmp.exists():
+        tmp.unlink(missing_ok=True)
+        return False
+    path.unlink()
+    tmp.rename(path)
+    return True
+
+
 def brightness(path):
     """Average luma, 0 is black. Some stock clips are nearly black and end up
     looking like a broken render once subtitles are the only thing visible."""
@@ -102,9 +126,25 @@ def fetch(query, n, key, page=1, skip=()):
             reject(v["id"])
             print(f"  - {dest.name} (too dark, luma {lum:.0f})")
             continue
+        if not normalize(dest):
+            dest.unlink(missing_ok=True)
+            reject(v["id"])
+            print(f"  - {dest.name} (could not re-encode)")
+            continue
         print(f"  + {dest.name}")
         got += 1
     return got
+
+
+def normalize_all():
+    """Bring a library downloaded before normalising up to date."""
+    clips = sorted(BROLL.glob("*.mp4"))
+    for i, c in enumerate(clips, 1):
+        print(f"  [{i}/{len(clips)}] {c.name}", flush=True)
+        if not normalize(c):
+            print(f"      failed, removing")
+            c.unlink(missing_ok=True)
+    print(f"{len(list(BROLL.glob('*.mp4')))} clips normalised")
 
 
 def audit():
@@ -144,6 +184,8 @@ if __name__ == "__main__":
         demo()
     elif "--audit" in sys.argv:
         audit()
+    elif "--normalize" in sys.argv:
+        normalize_all()
     elif not KEY.exists():
         sys.exit(f"Put your free Pexels API key in {KEY}\nGet one: https://www.pexels.com/api/")
     else:

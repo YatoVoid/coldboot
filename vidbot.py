@@ -140,7 +140,7 @@ Output nothing except the narration text."""
 
 
 class Unusable(Exception):
-    pass
+    """Skip this story and move on. Not a crash."""
 
 
 def write_script(story):
@@ -281,6 +281,12 @@ def build_bed(seconds, out_path, seed=""):
     lst.write_text("\n".join(entries), encoding="utf-8")
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
                     "-an", "-c", "copy", str(out_path)], check=True)
+    # -shortest in the render would silently cut the narration off if the bed
+    # came out short, so refuse instead. usually means clips are not normalised.
+    got = duration(out_path)
+    if got < seconds:
+        raise Unusable(f"footage is {got:.0f}s for {seconds:.0f}s of narration. "
+                       f"run: python broll.py --normalize")
     return out_path
 
 

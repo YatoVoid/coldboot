@@ -70,7 +70,16 @@ Then grab an opening set of clips:
 python broll.py
 ```
 
-About 40 clips, all CC0. It runs again every night so the library keeps growing and your footage stops repeating.
+About 20 clips, all CC0. Each one is checked for brightness and re-encoded to a single format on the way in, so it takes a few minutes. It runs again every night, one search page deeper each time, so the library keeps growing and your footage stops repeating.
+
+If you have a library from before this existed:
+
+```powershell
+python broll.py --audit      # drop duplicates and near-black clips
+python broll.py --normalize  # put them all in one format
+```
+
+The normalise step matters. Clips arrive at assorted resolutions and frame rates, and concatenating mixed formats produces a video shorter than its own audio, which cuts the narration off partway.
 
 ### YouTube access
 
