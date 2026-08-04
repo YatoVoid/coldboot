@@ -1,0 +1,26 @@
+# ---- SECRETS: never commit these ----
+pexels.key
+client_secret.json
+token.json
+*.key
+*secret*.json
+
+# ---- personal / machine state ----
+state.db
+logs/
+out/
+
+# ---- large downloaded assets (setup.ps1 refetches them) ----
+assets/
+raw.png
+banner.png
+banner_bg.png
+*.mp4
+*.wav
+*.ass
+
+# ---- python ----
+__pycache__/
+*.pyc
+.venv/
+_concat.txt
