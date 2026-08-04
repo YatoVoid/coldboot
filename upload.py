@@ -5,14 +5,54 @@ Run: python upload.py           (upload everything unpublished, up to the cap)
 First run opens a browser once to authorise, then stores token.json.
 Needs client_secret.json from Google Cloud (YouTube Data API v3, OAuth Desktop app).
 """
-import json, os, sqlite3, sys, time
+import atexit, json, os, sqlite3, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "out"
+DONE = OUT / "uploaded"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 DAILY_CAP = 6
 PRIVACY = "private"          # flip to "public" once you've watched a few
+
+# every file a video is made of, so they move together
+PARTS = (".mp4", ".json", ".txt", ".wav", ".ass")
+
+
+LOCK = ROOT / "upload.lock"
+
+
+def take_lock():
+    """Refuse to run twice at once.
+
+    Two uploaders working the same folder both see the same pending list and
+    upload every video twice, which puts duplicates on the channel and burns
+    the daily quota. Easy to do by accident: run it by hand while the nightly
+    job is going.
+    """
+    if LOCK.exists():
+        try:
+            pid = int(LOCK.read_text().strip())
+        except Exception:
+            pid = 0
+        if pid and pid_alive(pid):
+            sys.exit(f"upload.py is already running (pid {pid}). "
+                     f"If that is wrong, delete {LOCK.name}")
+        print(f"clearing stale lock from pid {pid}")
+    LOCK.write_text(str(os.getpid()))
+    atexit.register(lambda: LOCK.unlink(missing_ok=True))
+
+
+def pid_alive(pid):
+    if sys.platform == "win32":
+        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"],
+                             capture_output=True, text=True).stdout
+        return str(pid) in out
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
 
 
 def db():
@@ -22,6 +62,8 @@ def db():
 
 
 def pending(con):
+    """Videos in out/ that have not gone up. glob is not recursive, so anything
+    already moved to out/uploaded/ is out of the picture."""
     done = {r[0] for r in con.execute("SELECT file FROM uploaded")}
     return [p for p in sorted(OUT.glob("*.mp4"))
             if p.name not in done and not p.name.startswith("_")
@@ -91,15 +133,40 @@ def upload_one(yt, mp4):
     return response["id"]
 
 
+def archive(mp4):
+    """Move a finished video and its parts into out/uploaded.
+
+    Nothing is deleted. out/ stays as a queue of what has not gone up yet, and
+    you decide later what is worth keeping.
+    """
+    DONE.mkdir(parents=True, exist_ok=True)
+    moved = 0
+    for ext in PARTS:
+        src = mp4.with_suffix(ext)
+        if not src.exists():
+            continue
+        dest = DONE / src.name
+        if dest.exists():
+            dest.unlink()
+        src.replace(dest)
+        moved += 1
+    return moved
+
+
 def demo():
     """Get the cap wrong and you burn the quota without noticing."""
     assert DAILY_CAP * 1600 <= 10000, "would exceed YouTube's daily quota"
+    assert ".mp4" in PARTS and ".wav" in PARTS
+    assert DONE.parent == OUT, "archive must stay inside out/"
+    assert pid_alive(os.getpid()), "should see itself as running"
+    assert not pid_alive(999999), "should not see a nonexistent pid as running"
     print("demo ok")
 
 
 def main():
     if "--demo" in sys.argv:
         return demo()
+    take_lock()
     con = db()
     left = DAILY_CAP - used_today(con)
     if left <= 0:
@@ -117,7 +184,9 @@ def main():
             con.execute("INSERT OR REPLACE INTO uploaded VALUES (?,?,?)",
                         (mp4.name, vid, int(time.time())))
             con.commit()
+            n = archive(mp4)
             print(f"      {PRIVACY}: https://youtu.be/{vid}")
+            print(f"      moved {n} files to out/uploaded/")
         except Exception as e:
             print(f"      FAILED: {type(e).__name__}: {str(e)[:300]}")
 

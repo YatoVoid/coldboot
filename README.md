@@ -1,34 +1,34 @@
 # Cold Boot
 
-Makes narrated tech-news videos on your own machine while you sleep.
+Makes narrated news videos on your own machine while you sleep.
 
-It grabs stories off Hacker News, reads the articles, writes narration with a local LLM, speaks it with Piper, times captions with Whisper, cuts it over free stock footage, and uploads to YouTube. Nothing runs in the cloud. Nothing charges you monthly.
+It picks stories off a feed you choose, reads the articles, writes narration with a local LLM, speaks it with Piper, times captions with Whisper, cuts it over free stock footage, and uploads to YouTube. Nothing runs in the cloud. Nothing charges you monthly.
 
-Every account it needs is free.
+Every account it needs is free. Runs on Windows and Linux.
 
 ## Before you bother
 
-This saves you the work. It does not get you an audience.
+This automates the work. It does not get you an audience.
 
-YouTube pays nothing until 1,000 subscribers and 4,000 watch hours, which for a new channel is usually 3 to 6 months out. Faceless long-form tech video pays somewhere around $2 to $8 per thousand views, so roughly $1,000/month means roughly 300,000 views/month. Most channels that get there take the better part of a year.
+YouTube pays nothing until 1,000 subscribers and 4,000 watch hours. For a new channel that is realistically 3 to 6 months away. Faceless long-form video earns roughly $2 to $8 per thousand views, so about $1,000 a month means about 300,000 views a month, and most channels that get there take the better part of a year.
 
-YouTube also removes monetisation from channels pumping out generic AI narration. This pipeline reads real sources and is told not to invent things, which helps, but it won't save you if you pick a lazy niche and never watch what comes out.
+YouTube also demonetises channels pumping out generic AI narration. This reads real sources and is told not to invent things, which helps. It will not save you if you pick a lazy subject and never watch what comes out.
 
 Want money this month? Wrong tool.
 
 ## Requirements
 
-Windows 10/11, or Linux (Debian, Ubuntu, Fedora, Arch, openSUSE, Alpine). About 15 GB of disk, 16 GB of RAM (8 works, slower), Python 3.10+.
+Windows 10/11, or Linux (Debian, Ubuntu, Fedora, Arch, openSUSE, Alpine). About 15 GB of disk to start, 16 GB of RAM (8 works, slower), Python 3.10 or newer.
 
-On Windows get Python from [python.org](https://python.org) with "Add to PATH" ticked. On Linux it is almost certainly already installed.
+On Windows get Python from [python.org](https://python.org) with "Add to PATH" ticked. On Linux it is already there.
 
-A GPU is nice but not needed. On a Ryzen 9 8945HS laptop with no dedicated GPU it takes about 11 minutes per video.
+A GPU helps but is not needed. On a Ryzen 9 8945HS laptop with no dedicated GPU, one video takes about 11 minutes.
 
-You'll also want a Pexels account and a YouTube channel. Both free.
+---
 
-## Setup
+# Setup
 
-### Install everything
+## 1. Install
 
 Windows:
 
@@ -48,100 +48,122 @@ python3 configure.py
 ./setup.sh
 ```
 
-Either one pulls ffmpeg, Ollama, the Python packages, Piper, a voice model, and the LLM. Both print what they're doing, skip whatever is already installed, and can be re-run if they die partway.
+`configure.py` asks what the channel is about and writes `config.json`. `setup.ps1` / `setup.sh` installs ffmpeg, Ollama, the Python packages, Piper, a voice model and the language model.
 
-First run downloads about 7 GB. Give it 15 to 40 minutes. The model pull shows its own progress bar.
+First run downloads about 7 GB and takes 15 to 40 minutes. It prints each step, skips anything already installed, and you can re-run it if it dies partway. On Linux it asks for sudo when installing ffmpeg.
 
-To check the install without changing anything, use `.\setup.ps1 -Check` or `./setup.sh --check`.
+Check the install without changing anything:
 
-The Linux script picks the right package manager for apt, dnf, pacman, zypper and apk, and grabs the matching Piper build for x86_64, aarch64 or armv7l. It will ask for sudo when it installs ffmpeg.
+```
+.\setup.ps1 -Check          # windows
+./setup.sh --check          # linux
+```
 
-### Pexels key
+## 2. Pexels key
 
-Sign up at <https://www.pexels.com/api/>, copy the key, drop it in a file called `pexels.key`:
+Free, no card, takes two minutes. Sign up at <https://www.pexels.com/api/>, copy the key, and save it as `pexels.key` in this folder with nothing else in the file.
 
 ```powershell
 "YOUR_KEY_HERE" | Out-File -Encoding ascii pexels.key
 ```
 
-Then grab an opening set of clips:
+Then get an opening set of clips:
 
-```powershell
+```
 python broll.py
 ```
 
-About 20 clips, all CC0. Each one is checked for brightness and re-encoded to a single format on the way in, so it takes a few minutes. It runs again every night, one search page deeper each time, so the library keeps growing and your footage stops repeating.
-
-If you have a library from before this existed:
-
-```powershell
-python broll.py --audit      # drop duplicates and near-black clips
-python broll.py --normalize  # put them all in one format
-```
-
-The normalise step matters. Clips arrive at assorted resolutions and frame rates, and concatenating mixed formats produces a video shorter than its own audio, which cuts the narration off partway.
-
-### YouTube access
+## 3. YouTube access
 
 1. Make the channel.
 2. At <https://console.cloud.google.com>, create a project.
-3. APIs & Services, Library, find YouTube Data API v3, enable it.
-4. APIs & Services, OAuth consent screen, External, fill in what it asks.
-5. Under Audience, add the Google account that owns the channel to Test users. Miss this and sign-in fails with `Error 403: access_denied`.
-6. Still under Audience, press Publish app so the status is In production, not Testing. See below for why.
-7. Credentials, Create credentials, OAuth client ID, Desktop app, download the JSON.
+3. **APIs & Services → Library**, find **YouTube Data API v3**, enable it.
+4. **APIs & Services → OAuth consent screen**, choose External, fill in what it asks.
+5. Under **Audience**, add the Google account that owns the channel to **Test users**. Skip this and sign-in fails with `Error 403: access_denied`.
+6. Still under **Audience**, press **Publish app** so the status reads *In production*.
+7. **Credentials → Create credentials → OAuth client ID → Desktop app**, download the JSON.
 8. Save it here as `client_secret.json`.
 
-Google will call the app unverified when you sign in. That is expected for a personal app. Click Advanced, then the "go to (unsafe)" link. It is your app talking to your own channel.
+Google calls the app unverified when you sign in. That is normal for a personal app. Click **Advanced**, then the "go to (unsafe)" link. It is your app talking to your own channel.
 
-**Publish the app, do not leave it in Testing.** While the status is Testing, Google expires the refresh token after 7 days, so a nightly upload works for a week and then quietly stops until you sign in again. Publishing does not require Google verification. Verification only controls whether strangers see the warning screen, and an unverified production app still works for up to 100 users.
+**Step 6 is not optional.** While the app sits in Testing, Google expires the login after 7 days, so a nightly upload works for a week and then quietly stops. Publishing needs no Google review. Verification only decides whether strangers see the warning screen, and an unverified production app still works for up to 100 users.
 
-### Run
+---
 
-`.\run_daily.ps1` on Windows, `./run_daily.sh` on Linux.
+# Commands
 
-Footage, then videos, then upload. A browser opens once to authorise. After that it never asks again.
+Run these from the project folder. On Linux use `python3`.
 
-On a headless server there is no browser to open, so it prints the URL instead. Forward the port from your own machine first:
+| Command | What it does |
+|---|---|
+| `python configure.py` | Asks what the channel is about, writes `config.json` |
+| `python configure.py space` | Loads a preset without asking anything |
+| `python configure.py --list` | Lists the presets |
+| `python configure.py --check` | Says whether `config.json` is valid |
+| `python sources.py` | Prints the stories your source would offer today. Makes nothing |
+| `python broll.py` | Downloads new stock footage |
+| `python broll.py --audit` | Removes duplicate and near-black clips already downloaded |
+| `python broll.py --normalize` | Re-encodes the clip library to one format |
+| `python vidbot.py` | Makes videos. Does not upload |
+| `python upload.py` | Uploads what is waiting. Makes nothing |
+| `python finish.py` | Repairs half-built videos after a crash, then carries on |
+| `.\run_daily.ps1` / `./run_daily.sh` | All three stages: footage, videos, upload |
+| `<script> --demo` | Self-test. No network, no keys, no models, changes nothing |
 
-```bash
-ssh -L 8080:localhost:8080 user@thatbox
+## What each one actually does
+
+**`python broll.py`**
+Searches Pexels for the terms in `broll_queries`, one page deeper each run so the library keeps growing. Every clip is checked for brightness and re-encoded to one resolution and frame rate on the way in, which is why it is not instant. Rejected clip IDs are remembered so they are not downloaded twice. Writes to `assets/broll/`. Needs `pexels.key`.
+
+**`python vidbot.py`**
+Fetches candidate stories, skips any already used, downloads the article text, and refuses the story if too little text comes back rather than inventing one. Then writes narration with Ollama, speaks it with Piper, times captions with Whisper, and renders with ffmpeg. Writes `.txt`, `.wav`, `.ass`, `.mp4` and `.json` per video into `out/`. Records used stories in `state.db`.
+
+It uploads nothing. A story that fails is skipped and the next one is tried.
+
+**`python upload.py`**
+Uploads everything waiting in `out/`, up to 6 a day. Prints percentage, speed and time left as it goes. After each success it records the video in `state.db` and **moves the video and its files into `out/uploaded/`**. Nothing is deleted, ever. You decide what to keep.
+
+Videos go up **private**. They appear in YouTube Studio under Content, marked Private, visible to you and nobody else.
+
+Only one copy runs at a time. It writes `upload.lock` while working and refuses to start if another upload is already going, because two uploaders reading the same folder both see the same queue and put every video on the channel twice. If a run is killed the lock is left behind, and the next run notices the process is gone and clears it.
+
+**`run_daily.ps1` / `run_daily.sh`**
+Runs `broll.py`, then `vidbot.py`, then `upload.py`, and tees everything into `logs/`.
+
+## What it never does
+
+- Never uploads anything public unless you change `PRIVACY` in `upload.py`
+- Never deletes a video you made
+- Never uploads more than 6 a day, which is the YouTube API ceiling
+- Never covers the same story twice
+- Never writes about an article it could not read
+
+---
+
+# Where things end up
+
+```
+config.json          what the channel is about
+pexels.key           your key, never committed
+client_secret.json   your google credentials, never committed
+token.json           your login, written on first upload, never committed
+state.db             stories used and videos uploaded
+
+assets/broll/        the clip library
+out/                 finished videos waiting to upload
+out/uploaded/        videos already on youtube, kept for you to sort
+logs/                one file per run
 ```
 
-Uploads are set to private. Go watch them. When you're happy, change `PRIVACY` to `"public"` in `upload.py`.
+Each video is five files sharing a name: `.txt` the script, `.wav` the narration, `.ass` the captions, `.mp4` the video, `.json` the title and description. They move to `out/uploaded/` together.
 
-### Nightly
+**Disk fills up.** Six videos a night at the default bitrate is roughly 1 GB a day, and nothing is removed automatically. Empty `out/uploaded/` yourself when you want the space back. Deleting from there is safe; `state.db` remembers what already went up, so nothing gets re-uploaded.
 
-Windows:
+---
 
-```powershell
-$a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$PWD\run_daily.ps1`""
-$t = New-ScheduledTaskTrigger -Daily -At 2:00AM
-$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6)
-Register-ScheduledTask -TaskName "coldboot-daily" -Action $a -Trigger $t -Settings $s -Force
-```
+# Making it yours
 
-The PC has to be awake. Task Scheduler won't wake it. While plugged in: `powercfg /change standby-timeout-ac 0`.
-
-Linux, add to `crontab -e`:
-
-```
-0 2 * * * /full/path/to/coldboot/run_daily.sh >> /full/path/to/coldboot/logs/cron.log 2>&1
-```
-
-Cron gets a bare PATH, so if ollama or ffmpeg are somewhere unusual, set `PATH=` at the top of the crontab. A laptop that suspends will skip the run, same as Windows.
-
-## Making it yours
-
-Nothing here is tied to tech. Run the wizard and pick a subject:
-
-```powershell
-python configure.py
-```
-
-It asks what the channel is about, who watches, how it should be written, which voice, and how many videos a night. Then it writes `config.json`.
-
-Presets to start from:
+Nothing here is tied to tech. Run `python configure.py` and pick a subject, or start from a preset:
 
 | Preset | Subject | Stories from |
 |---|---|---|
@@ -151,9 +173,7 @@ Presets to start from:
 | `gaming` | game industry news | Eurogamer, RPS, PC Gamer |
 | `finance` | business and markets | MarketWatch, FT, Dow Jones |
 
-Load one directly with `python configure.py space`, list them with `--list`, check your config with `--check`.
-
-### Your own subject
+## Your own subject
 
 Point it at any RSS feed. Most news sites and blogs have one.
 
@@ -165,90 +185,116 @@ Point it at any RSS feed. Most news sites and blogs have one.
 }
 ```
 
-Three source types ship: `rss` (any feeds), `hackernews` (front page, filter with `min_points`), and `reddit` (`subreddits`, `period`). Reddit works through their RSS endpoint since the JSON API now needs OAuth, and it gets rate limited easily, so prefer `rss` when the subject has news sites covering it.
+Three source types ship:
 
-To add a source they don't cover, write a function in `sources.py` that returns `{title, url, score}` and add it to `FETCHERS`. That's the whole interface.
+- `rss` takes any list of `feeds`
+- `hackernews` takes `min_points`
+- `reddit` takes `subreddits` and `period`
 
-Change `broll_queries` to match the subject or your footage will not fit the words.
+Reddit goes through their RSS endpoint because the JSON API now needs OAuth, and it gets rate limited quickly. Prefer `rss` when news sites cover your subject.
 
-### Everything else
+To add a source of your own, write a function in `sources.py` returning `{title, url, score}` and add it to `FETCHERS`. That is the whole interface.
+
+Change `broll_queries` to match the subject or the footage will not fit the words.
+
+## Config
 
 | Key | What it does |
 |---|---|
-| `videos_per_run` | Videos per night. Start at 1 or 2. |
+| `niche`, `audience`, `angle` | What the writing sounds like. Worth real thought |
+| `source` | Where stories come from, see above |
+| `broll_queries` | Stock footage searches |
+| `videos_per_run` | Videos per night. Start at 1 or 2 |
 | `target_words` | 150 words is about a minute of speech |
 | `min_article_chars` | Under this, skip the story instead of guessing at it |
 | `model` | Any Ollama model. `qwen3:14b` if you have the RAM |
-| `niche`, `angle` | What the writing sounds like. Worth real thought |
 | `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
-| `bitrate` | `8M` looks good, `5M` halves upload size for no visible loss |
-| `encoder` | `auto` probes ffmpeg. Force it with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
+| `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |
+| `encoder` | `auto` test-encodes a few frames and picks what works. Force with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
 | `font` | `auto` means Arial on Windows, DejaVu Sans on Linux |
-| `youtube_category` | 28 science/tech, 20 gaming, 25 news, 27 education |
+| `youtube_category` | 28 science and tech, 20 gaming, 25 news, 27 education |
+| `min_brightness` | Clips darker than this are thrown away |
 
-YouTube allows 6 uploads a day per project. Each costs 1,600 of a 10,000 daily quota. `upload.py` won't go over.
+---
 
-## How it fits together
+# Running it nightly
 
-```
-broll.py    Pexels          -> assets/broll/*.mp4
-sources.py  rss/hn/reddit   -> candidate stories
-vidbot.py   pick one        -> deduped against state.db
-            article fetch   -> real text, not just a headline
-            Ollama          -> narration
-            Piper           -> wav
-            faster-whisper  -> word timings
-            ffmpeg          -> mp4 + metadata json
-upload.py   YouTube API     -> uploaded private, logged
-```
-
-Each script self-tests without network, keys or models:
+Windows:
 
 ```powershell
-python vidbot.py    --demo
-python sources.py   --demo
-python configure.py --demo
-python broll.py     --demo
-python upload.py    --demo
+$a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$PWD\run_daily.ps1`""
+$t = New-ScheduledTaskTrigger -Daily -At 2:00AM
+$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6)
+Register-ScheduledTask -TaskName "coldboot-daily" -Action $a -Trigger $t -Settings $s -Force
 ```
 
-To see what your source would pick up today, without making anything:
+The machine has to be awake. Task Scheduler will not wake it. While plugged in: `powercfg /change standby-timeout-ac 0`.
 
-```powershell
-python sources.py
+Linux, in `crontab -e`:
+
+```
+0 2 * * * /full/path/to/coldboot/run_daily.sh >> /full/path/to/coldboot/logs/cron.log 2>&1
 ```
 
-## Keys
+Cron gets a bare PATH, so add `PATH=` at the top of the crontab if ollama or ffmpeg live somewhere unusual.
 
-`.gitignore` covers `pexels.key`, `client_secret.json`, `token.json`, `*.key`, `state.db` and rendered media.
+## Going public
 
-Check `git status` yourself before your first commit anyway. Don't let a stranger's gitignore be the only thing between your credentials and a public URL.
+Videos upload private on purpose. Watch a few. When you are happy, edit `upload.py`:
 
-## Footage and staying unbanned
+```python
+PRIVACY = "public"
+```
 
-Pexels clips are CC0. Commercial use is fine, monetisation is fine, no attribution needed.
+Only new uploads are affected. Change the earlier ones in YouTube Studio.
 
-Piper is MIT, its voices are CC-BY-SA. Fine for this.
+---
 
-Don't swap the source for clips ripped from other YouTube channels. That's infringement, it earns Content ID claims and strikes, and it eventually takes down the channel you spent a year building.
-
-Watch your own videos before making them public. The model is told not to invent facts, but it's an 8B model on a laptop, not an editor. If it publishes something wrong, that's on you.
-
-## When it breaks
+# When it breaks
 
 | Problem | Cause |
 |---|---|
-| `No b-roll` | Run `python broll.py`. Needs `pexels.key`. |
-| Script step takes 6+ minutes | Normal on CPU. Use a smaller model. |
+| `403: access_denied` when signing in | Account is not in Test users, setup step 5 |
+| Uploads stop after about a week | App still in Testing, setup step 6 |
+| `quotaExceeded` | 6 uploads a day is the ceiling |
+| `No b-roll` | Run `python broll.py`. Needs `pexels.key` |
+| Upload seems frozen | It prints progress now. Slow uploads are just slow |
+| `upload.py is already running` | Another upload is going, or the nightly job is. Wait, or delete `upload.lock` if the pid is really gone |
+| Duplicate videos on the channel | Two uploads ran at once. Delete the extras in YouTube Studio |
+| Video shorter than its audio | Run `python broll.py --normalize` |
+| Script step takes 6+ minutes | Normal on CPU. Use a smaller model |
 | `ffmpeg not recognised` | Reopen the terminal so PATH refreshes |
 | `bad interpreter: ^M` | The .sh got CRLF endings. `sed -i 's/\r$//' *.sh` |
-| `externally-managed-environment` | Debian/Ubuntu pip guard. setup.sh retries with `--break-system-packages`, or use a venv |
-| No captions on Linux | Install fonts: `sudo apt install fonts-dejavu` |
-| `403: access_denied` at sign-in | Your account is not in Test users, see step 5 |
-| Uploads stop after about a week | App still in Testing, publish it, see step 6 |
-| `quotaExceeded` | 6 uploads a day, that's the ceiling |
+| `externally-managed-environment` | Debian pip guard. setup.sh retries with `--break-system-packages` |
+| No captions on Linux | `sudo apt install fonts-dejavu` |
 | Nothing ran overnight | Machine was asleep |
 
-## Licence
+Every script has a self-test that needs no network, no keys and no models:
 
-MIT. Fork it, change the niche, make it yours.
+```
+python vidbot.py --demo
+python sources.py --demo
+python configure.py --demo
+python broll.py --demo
+python upload.py --demo
+```
+
+---
+
+# Keys
+
+`.gitignore` covers `pexels.key`, `client_secret.json`, `token.json`, `*.key`, `state.db` and all rendered media.
+
+Check `git status` yourself before your first commit anyway. Never let someone else's gitignore be the only thing between your credentials and a public URL.
+
+# Footage and staying unbanned
+
+Pexels clips are CC0. Commercial use is fine, monetisation is fine, no attribution needed. Piper is MIT and its voices are CC-BY-SA.
+
+Do not swap the source for clips ripped from other YouTube channels. That is infringement, it earns Content ID claims and strikes, and it eventually takes down the channel you spent a year building.
+
+Watch your own videos before making them public. The model is told not to invent facts, but it is an 8B model on a laptop, not an editor. If it publishes something wrong, that is on you.
+
+# Licence
+
+MIT. Fork it, change the subject, make it yours.

@@ -9,6 +9,7 @@ token.json
 state.db
 logs/
 out/
+upload.lock
 
 # ---- large downloaded assets (setup.ps1 refetches them) ----
 assets/
