@@ -73,9 +73,22 @@ def upload_one(yt, mp4):
     body = {"snippet": {"title": meta["title"], "description": meta["description"],
                         "categoryId": cfg.get("youtube_category", "28")},
             "status": {"privacyStatus": PRIVACY, "selfDeclaredMadeForKids": False}}
-    req = yt.videos().insert(part="snippet,status", body=body,
-                             media_body=MediaFileUpload(str(mp4), chunksize=-1, resumable=True))
-    return req.execute()["id"]
+    # 4MB chunks rather than one shot, so a 400MB file can report progress.
+    # Sending it in a single request looks identical to a hang for minutes.
+    media = MediaFileUpload(str(mp4), chunksize=4 * 1024 * 1024, resumable=True)
+    req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+    mb = mp4.stat().st_size / 1e6
+    t0, response = time.time(), None
+    while response is None:
+        status, response = req.next_chunk()
+        if status:
+            done = status.progress()
+            rate = done * mb / max(1, time.time() - t0)
+            left = (1 - done) * mb / rate if rate else 0
+            print(f"\r      {done * 100:5.1f}%  of {mb:.0f}MB  "
+                  f"{rate:.1f}MB/s  {left / 60:.0f}m left   ", end="", flush=True)
+    print(f"\r      uploaded {mb:.0f}MB in {(time.time() - t0) / 60:.1f}m        ")
+    return response["id"]
 
 
 def demo():
@@ -94,16 +107,19 @@ def main():
     todo = pending(con)[:left]
     if not todo:
         return print("Nothing pending.")
+    print(f"{len(pending(con))} ready, uploading {len(todo)} today "
+          f"({sum(p.stat().st_size for p in todo) / 1e9:.1f}GB). This is slow.")
     yt = service()
-    for mp4 in todo:
+    for i, mp4 in enumerate(todo, 1):
+        print(f"  [{i}/{len(todo)}] {mp4.name[:56]}", flush=True)
         try:
             vid = upload_one(yt, mp4)
             con.execute("INSERT OR REPLACE INTO uploaded VALUES (?,?,?)",
                         (mp4.name, vid, int(time.time())))
             con.commit()
-            print(f"  {PRIVACY}: https://youtu.be/{vid}  ({mp4.name})")
+            print(f"      {PRIVACY}: https://youtu.be/{vid}")
         except Exception as e:
-            print(f"  FAILED {mp4.name}: {e}")
+            print(f"      FAILED: {type(e).__name__}: {str(e)[:300]}")
 
 
 if __name__ == "__main__":
