@@ -90,14 +90,30 @@ def normalize(path):
 
 
 def brightness(path):
-    """Average luma, 0 is black. Some stock clips are nearly black and end up
-    looking like a broken render once subtitles are the only thing visible."""
+    """Return (average luma, darkest sampled luma). 0 is black.
+
+    The average alone is not enough. A clip that is bright overall but fades
+    through black still puts a blank screen with floating subtitles in the
+    middle of a video, so the darkest moment has to be checked as well.
+    """
     out = subprocess.run(
         ["ffmpeg", "-v", "info", "-i", str(path), "-vf",
-         "select='not(mod(n\\,60))',signalstats,metadata=print:key=lavfi.signalstats.YAVG",
+         "select='not(mod(n\\,30))',signalstats,metadata=print:key=lavfi.signalstats.YAVG",
          "-vsync", "0", "-f", "null", "-"], capture_output=True, text=True).stderr
     vals = [float(x) for x in re.findall(r"YAVG=([\d.]+)", out)]
-    return sum(vals) / len(vals) if vals else -1
+    return (sum(vals) / len(vals), min(vals)) if vals else (-1, -1)
+
+
+def too_dark(path):
+    """Reason string if the clip is unusable, empty if it's fine."""
+    avg, low = brightness(path)
+    if avg < 0:
+        return "unreadable"
+    if avg < MIN_LUMA:
+        return f"too dark, luma {avg:.0f}"
+    if low < MIN_LUMA / 2:
+        return f"goes black, dips to {low:.0f}"
+    return ""
 
 
 def fetch(query, n, key, page=1, skip=()):
@@ -120,11 +136,11 @@ def fetch(query, n, key, page=1, skip=()):
             with open(dest, "wb") as fh:
                 for chunk in s.iter_content(1 << 20):
                     fh.write(chunk)
-        lum = brightness(dest)
-        if 0 <= lum < MIN_LUMA:
+        why = too_dark(dest)
+        if why:
             dest.unlink()
             reject(v["id"])
-            print(f"  - {dest.name} (too dark, luma {lum:.0f})")
+            print(f"  - {dest.name} ({why})")
             continue
         if not normalize(dest):
             dest.unlink(missing_ok=True)
@@ -158,9 +174,9 @@ def audit():
             removed += 1
             continue
         seen[vid] = c.name
-        lum = brightness(c)
-        if 0 <= lum < MIN_LUMA:
-            print(f"  - {c.name} (too dark, luma {lum:.0f})")
+        why = too_dark(c)
+        if why:
+            print(f"  - {c.name} ({why})")
             c.unlink()
             removed += 1
     print(f"removed {removed}, {len(list(BROLL.glob('*.mp4')))} clips left")
