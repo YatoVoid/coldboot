@@ -18,7 +18,7 @@ $cfg   = Get-Content (Join-Path $root "config.json") -Raw | ConvertFrom-Json
 $voice = $cfg.piper_voice
 $model = $cfg.model
 $step  = 0
-$total = 8
+$total = 9
 $fail  = @()
 
 function Refresh-Path {
@@ -124,6 +124,25 @@ foreach ($ext in @("", ".json")) {
 }
 
 # ---------------------------------------------------------------- 8 model
+Step "Downloading the Kokoro voice model (~340 MB)"
+if ($cfg.tts -eq "piper") {
+  Skip "not needed, config uses piper"
+} else {
+  $kdir = Join-Path $root "assets\kokoro"
+  New-Item -ItemType Directory -Force -Path $kdir | Out-Null
+  $kbase = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+  foreach ($f in @("kokoro-v1.0.onnx", "voices-v1.0.bin")) {
+    $dest = Join-Path $kdir $f
+    if (Test-Path $dest) { Skip $f }
+    elseif ($Check) { Bad "$f missing" }
+    else {
+      Work $f
+      try { Invoke-WebRequest "$kbase/$f" -OutFile $dest; OK $f }
+      catch { Bad "could not download $f" }
+    }
+  }
+}
+
 Step "Pulling the language model ($model, ~5 GB)"
 if (-not (Have "ollama")) { Bad "skipped, ollama not installed" }
 elseif ((ollama list 2>$null) -match [regex]::Escape($model)) { Skip $model }

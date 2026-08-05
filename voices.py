@@ -1,10 +1,13 @@
 """Listen to voices on your own script, then pick one.
 
     python voices.py               what is available and what you use now
-    python voices.py --try         download them all and render a sample of each
-    python voices.py --try en_US-lessac-high en_GB-cori-high
-    python voices.py --set en_US-lessac-high
+    python voices.py --try         render a sample of each
+    python voices.py --try am_eric bm_george
+    python voices.py --set am_eric
     python voices.py --demo
+
+Works for both engines. Kokoro voices look like am_eric, Piper voices look
+like en_US-lessac-high, and --set works out which you meant.
 
 Samples land in out/voices/. Play them, pick one, set it.
 """
@@ -17,8 +20,24 @@ PIPER_DIR = ROOT / "assets" / "piper"
 SAMPLES = ROOT / "out" / "voices"
 BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
 
-# a shortlist that suits narration. there are hundreds more at the link above,
-# most are worse for this or are not english.
+# kokoro is the default engine. a is american, b is british, m is male,
+# f is female. the full list is in the kokoro model card.
+KOKORO = [
+    ("am_eric", "US male, natural and level. the default"),
+    ("am_michael", "US male, a little warmer"),
+    ("am_adam", "US male, deeper"),
+    ("am_puck", "US male, lighter and quicker"),
+    ("am_onyx", "US male, low and slow"),
+    ("af_heart", "US female, warm"),
+    ("af_bella", "US female, clear and bright"),
+    ("af_nicole", "US female, softer, quieter"),
+    ("bm_george", "UK male, measured"),
+    ("bm_lewis", "UK male, deeper"),
+    ("bf_emma", "UK female, calm"),
+    ("bf_isabella", "UK female, crisper"),
+]
+
+# piper is the fallback engine. faster, noticeably more synthetic.
 CHOICES = [
     ("en_US-lessac-high", "US male, warm and even. the easiest to listen to for 8 minutes"),
     ("en_US-hfc_female-medium", "US female, conversational, least announcer-like"),
@@ -98,6 +117,21 @@ def speak(name, text, wav):
     return r.returncode == 0 and wav.exists()
 
 
+def is_kokoro(name):
+    """Kokoro names are like am_eric. Piper names carry a locale, en_US-ryan-high."""
+    return "-" not in name
+
+
+def speak_kokoro(name, text, wav):
+    import soundfile
+    sys.path.insert(0, str(ROOT))
+    import vidbot
+    samples, rate = vidbot.kokoro().create(
+        text, voice=name, speed=cfg().get("speech_rate", 1.0), lang="en-us")
+    soundfile.write(str(wav), samples, rate)
+    return wav.exists()
+
+
 def try_voices(names):
     SAMPLES.mkdir(parents=True, exist_ok=True)
     text = sample_text()
@@ -105,25 +139,36 @@ def try_voices(names):
     made = []
     for name in names:
         print(f"  {name}", flush=True)
-        if not download(name):
-            continue
         wav = SAMPLES / f"{name}.wav"
-        if speak(name, text, wav):
+        try:
+            if is_kokoro(name):
+                done = speak_kokoro(name, text, wav)
+            else:
+                done = download(name) and speak(name, text, wav)
+        except Exception as e:
+            print(f"      failed: {type(e).__name__}: {str(e)[:90]}")
+            continue
+        if done:
             made.append(wav)
         else:
-            print(f"      failed to render")
+            print("      failed to render")
     print(f"\n{len(made)} samples in {SAMPLES}")
     print("play them, then set the one you like:")
     print(f"  python voices.py --set {names[0]}\n")
 
 
 def set_voice(name):
-    if not download(name):
-        sys.exit(f"could not download {name}")
     c = cfg()
-    c["piper_voice"] = name
+    if is_kokoro(name):
+        c["tts"] = "kokoro"
+        c["kokoro_voice"] = name
+    else:
+        if not download(name):
+            sys.exit(f"could not download {name}")
+        c["tts"] = "piper"
+        c["piper_voice"] = name
     CONFIG.write_text(json.dumps(c, indent=2) + "\n", encoding="utf-8")
-    print(f"voice set to {name}")
+    print(f"voice set to {name} ({c['tts']})")
     print("this affects new videos. existing ones keep the voice they were made with.")
 
 
@@ -133,6 +178,9 @@ def demo():
     assert voice_url("en_GB-northern_english_male-medium").endswith(
         "/en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium.onnx")
     assert "hfc_female" in voice_url("en_US-hfc_female-medium")
+    # telling the two naming schemes apart is what routes --set correctly
+    assert is_kokoro("am_eric") and is_kokoro("bf_emma")
+    assert not is_kokoro("en_US-ryan-high")
     print("demo ok")
 
 
@@ -144,15 +192,20 @@ if __name__ == "__main__":
         set_voice(a[a.index("--set") + 1])
     elif "--try" in a:
         picked = [x for x in a[a.index("--try") + 1:] if not x.startswith("-")]
-        try_voices(picked or [n for n, _ in CHOICES])
+        try_voices(picked or [n for n, _ in KOKORO])
     else:
-        current = cfg().get("piper_voice")
-        print(f"\nusing: {current}\n")
-        for name, desc in CHOICES:
-            mark = "installed" if have(name) else ""
+        c = cfg()
+        engine = c.get("tts", "kokoro")
+        current = c.get("kokoro_voice") if engine == "kokoro" else c.get("piper_voice")
+        print(f"\nusing: {current}  ({engine}, speed {c.get('speech_rate', 1.0)})\n")
+        print("kokoro, the default. slower to generate, sounds far better.\n")
+        for name, desc in KOKORO:
             star = ">" if name == current else " "
             print(f" {star} {name:<38} {desc}")
-            if mark:
-                print(f"   {'':38} ({mark})")
-        print("\nhear them all:  python voices.py --try")
-        print("pick one:       python voices.py --set en_US-lessac-high\n")
+        print("\npiper, the fallback. quick and offline, clearly synthetic.\n")
+        for name, desc in CHOICES:
+            star = ">" if name == current else " "
+            mark = "  (installed)" if have(name) else ""
+            print(f" {star} {name:<38} {desc}{mark}")
+        print("\nhear them:  python voices.py --try")
+        print("pick one:   python voices.py --set am_eric\n")

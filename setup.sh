@@ -10,7 +10,7 @@ PIPER_DIR="$ROOT/assets/piper"
 CHECK=0
 [ "${1:-}" = "--check" ] && CHECK=1
 STEP=0
-TOTAL=8
+TOTAL=9
 FAILED=()
 
 C_CYAN=$'\033[36m'; C_GREEN=$'\033[32m'; C_YEL=$'\033[33m'
@@ -148,6 +148,24 @@ for EXT in "" ".json"; do
     curl -fsSL "$BASE$EXT" -o "$DEST" && ok "$VOICE.onnx$EXT" || bad "voice download failed"
   fi
 done
+
+step "Downloading the Kokoro voice model (~340 MB)"
+TTS=$(python3 -c "import json;print(json.load(open('$ROOT/config.json')).get('tts','kokoro'))")
+if [ "$TTS" = "piper" ]; then
+  skip "not needed, config uses piper"
+else
+  KDIR="$ROOT/assets/kokoro"
+  mkdir -p "$KDIR"
+  KBASE="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+  for f in kokoro-v1.0.onnx voices-v1.0.bin; do
+    if [ -f "$KDIR/$f" ]; then skip "$f"
+    elif [ "$CHECK" = 1 ]; then bad "$f missing"
+    else
+      work "$f"
+      curl -fsSL "$KBASE/$f" -o "$KDIR/$f" && ok "$f" || bad "could not download $f"
+    fi
+  done
+fi
 
 step "Pulling the language model"
 MODEL=$(python3 -c "import json;print(json.load(open('$ROOT/config.json'))['model'])")

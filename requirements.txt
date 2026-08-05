@@ -1,5 +1,7 @@
 requests
 defusedxml
 faster-whisper
+kokoro-onnx
+soundfile
 google-api-python-client
 google-auth-oauthlib

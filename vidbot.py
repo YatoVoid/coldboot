@@ -287,9 +287,47 @@ def clean_script(t):
 
 
 # ---------------------------------------------------------------- voice
+KOKORO_DIR = ASSETS / "kokoro"
+_kokoro = None
+
+
+def kokoro():
+    """Loaded once and kept. Startup is under a second but the model is 310MB."""
+    global _kokoro
+    if _kokoro is None:
+        model = KOKORO_DIR / "kokoro-v1.0.onnx"
+        voices = KOKORO_DIR / "voices-v1.0.bin"
+        if not (model.exists() and voices.exists()):
+            sys.exit(f"Kokoro model missing from {KOKORO_DIR}. Run setup again, "
+                     f"or set \"tts\": \"piper\" in config.json")
+        from kokoro_onnx import Kokoro
+        _kokoro = Kokoro(str(model), str(voices))
+    return _kokoro
+
+
 def narrate(text, wav):
+    if CFG.get("tts", "kokoro") == "piper":
+        return narrate_piper(text, wav)
+    return narrate_kokoro(text, wav)
+
+
+def narrate_kokoro(text, wav):
+    """Kokoro sounds markedly less synthetic than Piper for about twice the
+    compute. It splits long text itself, so a whole script goes in at once."""
+    import soundfile
+    samples, rate = kokoro().create(
+        text, voice=CFG.get("kokoro_voice", "am_eric"),
+        speed=CFG.get("speech_rate", 1.0), lang=CFG.get("kokoro_lang", "en-us"))
+    part = wav.with_suffix(".wav.part")
+    # format has to be named, soundfile cannot guess it from a .part suffix
+    soundfile.write(str(part), samples, rate, format="WAV", subtype="PCM_16")
+    part.replace(wav)
+    return wav
+
+
+def narrate_piper(text, wav):
     if not PIPER.exists():
-        sys.exit(f"Piper missing. Run setup.ps1 first. Expected {PIPER}")
+        sys.exit(f"Piper missing. Run setup first. Expected {PIPER}")
     voice = ASSETS / "piper" / f"{CFG['piper_voice']}.onnx"
     env = None
     if not WINDOWS:

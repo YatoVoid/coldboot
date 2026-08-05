@@ -2,7 +2,7 @@
 
 Makes narrated news videos on your own machine while you sleep.
 
-It picks stories off a feed you choose, reads the articles, writes narration with a local LLM, speaks it with Piper, times captions with Whisper, cuts it over free stock footage, and uploads to YouTube. Nothing runs in the cloud. Nothing charges you monthly.
+It picks stories off a feed you choose, reads the articles, writes narration with a local LLM, speaks it with Kokoro, times captions with Whisper, cuts it over free stock footage, and uploads to YouTube. Nothing runs in the cloud. Nothing charges you monthly.
 
 Every account it needs is free. Runs on Windows, Linux and macOS.
 
@@ -50,7 +50,7 @@ python3 configure.py
 
 `setup.sh` picks the right package manager for apt, dnf, pacman, zypper, apk and Homebrew, and the right Piper build for x86_64, aarch64, armv7l and Apple silicon.
 
-`configure.py` asks what the channel is about and writes `config.json`. `setup.ps1` / `setup.sh` installs ffmpeg, Ollama, the Python packages, Piper, a voice model and the language model.
+`configure.py` asks what the channel is about and writes `config.json`. `setup.ps1` / `setup.sh` installs ffmpeg, Ollama, the Python packages, the Kokoro voice model, Piper as a fallback, and the language model.
 
 First run downloads about 7 GB and takes 15 to 40 minutes. It prints each step, skips anything already installed, and you can re-run it if it dies partway. On Linux it asks for sudo when installing ffmpeg.
 
@@ -149,7 +149,7 @@ First it counts what is already waiting in `out/`. Uploads are capped at 6 a day
 
 Then it fetches candidate stories, skips any already used, downloads the article text, and refuses the story if too little text comes back rather than inventing one.
 
-Two stories count as the same if their headlines share the same significant words, so the same event picked up from a second feed, or reworded slightly, does not become a second video. Then writes narration with Ollama, speaks it with Piper, times captions with Whisper, and renders with ffmpeg. Writes `.txt`, `.wav`, `.ass`, `.mp4` and `.json` per video into `out/`. Records used stories in `state.db`.
+Two stories count as the same if their headlines share the same significant words, so the same event picked up from a second feed, or reworded slightly, does not become a second video. Then writes narration with Ollama, speaks it with Kokoro, times captions with Whisper, and renders with ffmpeg. Writes `.txt`, `.wav`, `.ass`, `.mp4` and `.json` per video into `out/`. Records used stories in `state.db`.
 
 It uploads nothing. A story that fails is skipped and the next one is tried.
 
@@ -165,49 +165,62 @@ Four stages, tee'd into `logs/`: repair anything left half done, top up footage,
 
 ## Picking a voice
 
-The default sounds like a newsreader, which gets tiring across eight minutes. Hear the alternatives on your own writing:
+Two engines ship. Both are free, both run offline, neither sends your text anywhere.
+
+**Kokoro** is the default and sounds close to a real narrator. **Piper** is the fallback, roughly twice as fast to generate but clearly synthetic. On a laptop CPU, Kokoro turns a 1,100 word script into 6.5 minutes of audio in about 2.5 minutes, so it adds a minute or so per video against Piper.
+
+Hear them on your own writing:
 
 ```
 python voices.py --try
 ```
 
-That downloads a shortlist, reads 70 words of one of your actual scripts in each, and drops the wavs in `out/voices/`. Play them, then:
+That reads 70 words of one of your actual scripts in each voice and drops the wavs in `out/voices/`. Play them, then:
 
 ```
-python voices.py --set en_US-lessac-high
+python voices.py --set am_eric
 ```
 
-New videos use it. Existing ones keep the voice they were made with.
+`--set` works out which engine the name belongs to and switches to it. New videos use it. Existing ones keep the voice they were made with.
 
-Worth knowing what each is like:
+### Kokoro voices
+
+`a` is American, `b` is British, `m` is male, `f` is female.
 
 | Voice | Sounds like |
 |---|---|
-| `en_US-lessac-high` | US male, warm and even. easiest to listen to for a long video |
-| `en_US-hfc_female-medium` | US female, conversational, least announcer-like |
-| `en_US-hfc_male-medium` | US male, relaxed |
-| `en_GB-cori-high` | UK female, measured |
-| `en_GB-alan-medium` | UK male, quiet and dry |
-| `en_US-ryan-high` | US male, clipped news read. the old default |
+| `am_eric` | US male, natural and level. the default |
+| `am_michael` | US male, warmer |
+| `am_adam` | US male, deeper |
+| `am_puck` | US male, lighter and quicker |
+| `af_heart` | US female, warm |
+| `af_bella` | US female, clear and bright |
+| `bm_george` | UK male, measured |
+| `bf_emma` | UK female, calm |
 
-`high` in the name means a bigger model and better audio. It costs a little more time per video and is worth it.
+Run `python voices.py` for the full shortlist, and see the [Kokoro model card](https://huggingface.co/hexgrad/Kokoro-82M) for every voice including other languages.
 
-There are hundreds more at [the Piper voice list](https://huggingface.co/rhasspy/piper-voices), including many languages. Any of them works, name it exactly as the file is named and `--set` will fetch it.
+### Piper voices
 
-### Pacing matters as much as the voice
+Worth it if generation speed matters more to you than sound, or the machine is weak. `en_US-lessac-high` is the best of them. `high` in the name means a bigger model and better audio. Any voice from [the Piper list](https://huggingface.co/rhasspy/piper-voices) works, named exactly as the file is, and `--set` fetches it.
 
-Two settings in `config.json` do more for the robot problem than switching voice:
+### Pacing
 
 | Key | Effect |
 |---|---|
-| `speech_rate` | Above 1 is slower. `1.05` to `1.15` sounds notably more human. Below 1 rushes |
-| `sentence_silence` | Seconds of pause between sentences. `0.45` gives it room to breathe |
+| `speech_rate` | Kokoro: above 1 is faster, below 1 is slower. Piper: the opposite, above 1 is slower |
+| `sentence_silence` | Piper only. Seconds of pause between sentences |
 
-Rushed delivery with no pauses is most of what reads as synthetic. Slow it down before you blame the voice.
+Note the two engines read `speech_rate` in opposite directions, which is how each library defines it. Kokoro at `1.0` runs near 170 words a minute, which is a normal narration pace.
 
-### If it still is not good enough
+### Switching engines by hand
 
-Piper is fast, free and runs offline, and that is the trade. It will not match a paid cloud voice. If you want a real step up and can spend the setup effort, [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) is also free, also local, and sounds considerably more natural. It would mean replacing the `narrate` function in `vidbot.py`, which is about twenty lines.
+```json
+"tts": "kokoro",
+"kokoro_voice": "am_eric"
+```
+
+Set `"tts": "piper"` to go back. Setup skips the 340 MB Kokoro download when the config asks for Piper.
 
 ## If the power cuts out mid-run
 
@@ -255,6 +268,8 @@ token.json           your login, written on first upload, never committed
 state.db             stories used and videos uploaded
 
 assets/broll/        the clip library
+assets/kokoro/       the voice model, 340 MB
+assets/piper/        the fallback voice engine
 out/                 finished videos waiting to upload
 out/uploaded/        videos already on youtube, kept for you to sort
 logs/                one file per run
@@ -316,9 +331,11 @@ Change `broll_queries` to match the subject or the footage will not fit the word
 | `min_article_chars` | Under this, skip the story instead of guessing at it |
 | `max_queue` | Stop making videos once this many are waiting. Keep it equal to the 6 a day upload limit so nothing publishes late |
 | `model` | Any Ollama model. `qwen3:14b` if you have the RAM |
-| `piper_voice` | Set it with `voices.py`, or name any [Piper voice](https://huggingface.co/rhasspy/piper-voices) |
-| `speech_rate` | Above 1 is slower. `1.05` to `1.15` sounds more human |
-| `sentence_silence` | Pause between sentences in seconds. `0.45` is a good start |
+| `tts` | `kokoro` sounds better, `piper` generates faster |
+| `kokoro_voice` | Set it with `voices.py`. `am_eric` by default |
+| `piper_voice` | Used only when `tts` is `piper` |
+| `speech_rate` | Kokoro: above 1 is faster. Piper: above 1 is slower |
+| `sentence_silence` | Piper only. Pause between sentences in seconds |
 | `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |
 | `encoder` | `auto` test-encodes a few frames and picks what works. Force with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
 | `font` | `auto` means Arial on Windows, DejaVu Sans elsewhere |
@@ -407,7 +424,8 @@ Be clear with yourself about what this switch means. After it, a machine writes 
 | `config.json` not found | Run `python configure.py`, or copy `config.example.json` over it |
 | Uploads went public unexpectedly | `privacy` in `config.json`. It ships as `private` |
 | Nothing ran overnight | Machine was asleep |
-| Voice sounds robotic | Try `python voices.py --try`, and raise `speech_rate` to 1.1 |
+| Voice sounds robotic | You are probably on Piper. `python voices.py --set am_eric` |
+| `Kokoro model missing` | Run setup again, or set `"tts": "piper"` in `config.json` |
 
 Every script has a self-test that needs no network, no keys and no models:
 

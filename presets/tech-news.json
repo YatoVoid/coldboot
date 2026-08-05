@@ -20,8 +20,10 @@
   "width": 1920, "height": 1080, "fps": 30,
   "font": "auto", "bitrate": "8M", "encoder": "auto",
 
+  "tts": "kokoro",
+  "kokoro_voice": "am_eric",
   "piper_voice": "en_US-ryan-high",
-  "speech_rate": 1.05,
+  "speech_rate": 1.0,
   "sentence_silence": 0.45,
   "whisper_model": "base.en",
   "youtube_category": "28"
