@@ -65,9 +65,12 @@ def pending(con):
     """Videos in out/ that have not gone up. glob is not recursive, so anything
     already moved to out/uploaded/ is out of the picture."""
     done = {r[0] for r in con.execute("SELECT file FROM uploaded")}
-    return [p for p in sorted(OUT.glob("*.mp4"))
-            if p.name not in done and not p.name.startswith("_")
-            and (p.with_suffix(".json")).exists()]
+    ready = [p for p in OUT.glob("*.mp4")
+             if p.name not in done and not p.name.startswith("_")
+             and (p.with_suffix(".json")).exists()]
+    # oldest first. sorting by name meant a story could sit for days while
+    # alphabetically luckier ones went ahead of it, and news goes stale.
+    return sorted(ready, key=lambda p: p.stat().st_mtime)
 
 
 def used_today(con):

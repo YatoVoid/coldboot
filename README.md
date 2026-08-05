@@ -96,6 +96,7 @@ Run these from the project folder. On Linux use `python3`.
 
 | Command | What it does |
 |---|---|
+| `python status.py` | When the next run is, what is queued, what went up. Changes nothing |
 | `python configure.py` | Asks what the channel is about, writes `config.json` |
 | `python configure.py space` | Loads a preset without asking anything |
 | `python configure.py --list` | Lists the presets |
@@ -109,6 +110,26 @@ Run these from the project folder. On Linux use `python3`.
 | `python finish.py` | Repairs half-built videos after a crash, then carries on |
 | `.\run_daily.ps1` / `./run_daily.sh` | All three stages: footage, videos, upload |
 | `<script> --demo` | Self-test. No network, no keys, no models, changes nothing |
+
+## Checking on it
+
+```
+python status.py
+```
+
+```
+  next run    8/6/2026 2:00:00 AM
+  last run    8/5/2026 2:00:01 AM  ok
+
+  waiting to upload   11 videos, 2.9 GB
+      next up: ...
+      and 5 more after that, 6 go per day
+
+  uploaded            6 total, 6 in the last 24h
+      quota left today: 0 of 6
+```
+
+`last run ok` means the scheduler reported success. Anything else prints the failure code. This is the one command to run when you want to know whether it is still working.
 
 ## What each one actually does
 
