@@ -23,8 +23,14 @@ work() { printf '      %s...   %s%s\n' "$C_YEL" "$1" "$C_OFF"; }
 bad()  { printf '      %sFAIL  %s%s\n' "$C_RED" "$1" "$C_OFF"; FAILED+=("$1"); }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+MAC=0
+[ "$(uname -s)" = "Darwin" ] && MAC=1
+
 # which package manager, so this works past just ubuntu
-if   have apt-get; then PM="sudo apt-get install -y";  UPDATE="sudo apt-get update -qq"
+if [ "$MAC" = 1 ]; then
+  if have brew; then PM="brew install"; UPDATE=":"
+  else PM=""; UPDATE=":"; fi
+elif have apt-get; then PM="sudo apt-get install -y";  UPDATE="sudo apt-get update -qq"
 elif have dnf;     then PM="sudo dnf install -y";      UPDATE=":"
 elif have pacman;  then PM="sudo pacman -S --noconfirm"; UPDATE=":"
 elif have zypper;  then PM="sudo zypper install -y";   UPDATE=":"
@@ -33,7 +39,7 @@ else PM=""; UPDATE=":"; fi
 
 echo
 echo "====================================================="
-echo "  Cold Boot setup (Linux)"
+if [ "$MAC" = 1 ]; then echo "  Cold Boot setup (macOS)"; else echo "  Cold Boot setup (Linux)"; fi
 echo "  First run downloads about 7 GB. Give it 15-40 min."
 echo "====================================================="
 START=$(date +%s)
@@ -58,7 +64,9 @@ fi
 step "Installing ffmpeg"
 if have ffmpeg; then skip "ffmpeg"
 elif [ "$CHECK" = 1 ]; then bad "ffmpeg missing"
-elif [ -z "$PM" ]; then bad "unknown package manager, install ffmpeg yourself"
+elif [ -z "$PM" ]; then
+  if [ "$MAC" = 1 ]; then bad "install homebrew first, see https://brew.sh"
+  else bad "unknown package manager, install ffmpeg yourself"; fi
 else
   work "installing ffmpeg"
   $UPDATE >/dev/null 2>&1
@@ -69,6 +77,11 @@ fi
 step "Installing Ollama (writes the scripts, runs offline)"
 if have ollama; then skip "ollama"
 elif [ "$CHECK" = 1 ]; then bad "ollama missing"
+elif [ "$MAC" = 1 ]; then
+  # the install.sh on ollama.com is linux only
+  work "brew install ollama, then it needs 'ollama serve' running"
+  [ -n "$PM" ] && $PM ollama
+  have ollama && ok "ollama installed" || bad "install ollama from https://ollama.com"
 else
   work "downloading from ollama.com, about 1.5 GB"
   curl -fsSL https://ollama.com/install.sh | sh
@@ -91,12 +104,20 @@ step "Downloading Piper (the voice engine)"
 if [ -x "$PIPER_DIR/piper" ]; then skip "piper"
 elif [ "$CHECK" = 1 ]; then bad "piper missing"
 else
-  case "$(uname -m)" in
-    x86_64)         ARCH=linux_x86_64 ;;
-    aarch64|arm64)  ARCH=linux_aarch64 ;;
-    armv7l)         ARCH=linux_armv7l ;;
-    *) bad "no piper build for $(uname -m)"; ARCH="" ;;
-  esac
+  if [ "$MAC" = 1 ]; then
+    case "$(uname -m)" in
+      x86_64)  ARCH=macos_x64 ;;
+      arm64)   ARCH=macos_aarch64 ;;
+      *) bad "no piper build for $(uname -m)"; ARCH="" ;;
+    esac
+  else
+    case "$(uname -m)" in
+      x86_64)         ARCH=linux_x86_64 ;;
+      aarch64|arm64)  ARCH=linux_aarch64 ;;
+      armv7l)         ARCH=linux_armv7l ;;
+      *) bad "no piper build for $(uname -m)"; ARCH="" ;;
+    esac
+  fi
   if [ -n "$ARCH" ]; then
     work "piper_$ARCH.tar.gz"
     curl -fsSL "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_${ARCH}.tar.gz" \

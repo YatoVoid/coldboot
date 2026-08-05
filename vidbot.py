@@ -76,14 +76,31 @@ def db():
 
 
 # ---------------------------------------------------------------- sourcing
+STOP = {"the", "a", "an", "of", "to", "in", "on", "for", "and", "is", "are",
+        "with", "how", "why", "what", "show", "hn", "ask"}
+
+
+def topic_key(title):
+    """Loose fingerprint of a headline, so the same story from two feeds and
+    lightly reworded follow-ups both collapse onto one key."""
+    words = re.findall(r"[a-z0-9]+", title.lower())
+    keep = sorted(w for w in words if w not in STOP and len(w) > 2)
+    return " ".join(keep[:8])
+
+
 def pick_stories(n):
     """Stories from whichever source config.json names, minus ones already used."""
     con, out = db(), []
+    seen_keys = {topic_key(t) for (t,) in con.execute("SELECT title FROM seen")}
     for s in sources.fetch(CFG["source"]):
         if not s["url"] or not s["title"]:
             continue
         if con.execute("SELECT 1 FROM seen WHERE url=?", (s["url"],)).fetchone():
             continue
+        key = topic_key(s["title"])
+        if key in seen_keys:           # same story, different link
+            continue
+        seen_keys.add(key)             # and not twice within one batch either
         out.append(s)
         if len(out) >= n:
             break
@@ -249,8 +266,10 @@ def narrate(text, wav):
     voice = ASSETS / "piper" / f"{CFG['piper_voice']}.onnx"
     env = None
     if not WINDOWS:
-        # the linux build ships its own .so files next to the binary
-        env = dict(os.environ, LD_LIBRARY_PATH=str(PIPER.parent))
+        # the unix builds ship their own libraries next to the binary
+        env = dict(os.environ,
+                   LD_LIBRARY_PATH=str(PIPER.parent),
+                   DYLD_LIBRARY_PATH=str(PIPER.parent))
     subprocess.run([str(PIPER), "-m", str(voice), "-f", str(wav), "--sentence-silence", "0.35"],
                    input=text.encode("utf-8"), check=True, env=env)
     return wav
@@ -419,6 +438,11 @@ def demo():
     assert parse_meta('Sure!\n{"title": "A", "description": "B",}')["description"] == "B"
     assert parse_meta("no json here at all") == {}
     assert summarise("One. Two. Three.") == "One. Two."
+
+    # the same story reworded, or reposted elsewhere, is still the same story
+    assert topic_key("Show HN: Apple Sues OpenAI") == topic_key("Apple sues OpenAI")
+    assert topic_key("The Xbox Outage Explained") == topic_key("Xbox outage explained")
+    assert topic_key("Apple sues OpenAI") != topic_key("Google sues Meta")
     print("demo ok")
 
 
@@ -427,8 +451,20 @@ def main():
         return demo()
     OUT.mkdir(exist_ok=True)
     BROLL.mkdir(parents=True, exist_ok=True)
-    want = CFG["videos_per_run"]
-    print(f"Goal: {want} video(s). Fetching Hacker News front page...", flush=True)
+    # only make what can actually go out. uploads are capped at 6 a day, so
+    # making 6 a night on top of a queue means every story publishes days late.
+    # out/ holds only un-uploaded videos, finished ones move to out/uploaded/.
+    queued = len([p for p in OUT.glob("*.mp4") if not p.name.startswith("_")])
+    room = max(0, CFG.get("max_queue", 6) - queued)
+    want = min(CFG["videos_per_run"], room)
+    if want == 0:
+        return print(f"{queued} videos already waiting to upload, "
+                     f"which is the daily limit. Making none tonight so the "
+                     f"queue drains and stories go out fresh.")
+    if want < CFG["videos_per_run"]:
+        print(f"{queued} already queued, making {want} instead of "
+              f"{CFG['videos_per_run']} to keep the backlog flat.")
+    print(f"Goal: {want} video(s). Fetching stories...", flush=True)
     stories = pick_stories(want * 6)          # most stories won't extract cleanly
     if not stories:
         return print("Nothing new above the points threshold. Try again tomorrow.")

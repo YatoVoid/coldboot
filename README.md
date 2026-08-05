@@ -18,9 +18,9 @@ Want money this month? Wrong tool.
 
 ## Requirements
 
-Windows 10/11, or Linux (Debian, Ubuntu, Fedora, Arch, openSUSE, Alpine). About 15 GB of disk to start, 16 GB of RAM (8 works, slower), Python 3.10 or newer.
+Windows 10/11, Linux (Debian, Ubuntu, Fedora, Arch, openSUSE, Alpine), or macOS. About 15 GB of disk to start, 16 GB of RAM (8 works, slower), Python 3.10 or newer.
 
-On Windows get Python from [python.org](https://python.org) with "Add to PATH" ticked. On Linux it is already there.
+On Windows get Python from [python.org](https://python.org) with "Add to PATH" ticked. On Linux it is already there. On macOS you need [Homebrew](https://brew.sh) before running setup.
 
 A GPU helps but is not needed. On a Ryzen 9 8945HS laptop with no dedicated GPU, one video takes about 11 minutes.
 
@@ -39,7 +39,7 @@ python configure.py
 .\setup.ps1
 ```
 
-Linux:
+Linux and macOS:
 
 ```bash
 git clone https://github.com/YatoVoid/coldboot.git
@@ -47,6 +47,8 @@ cd coldboot
 python3 configure.py
 ./setup.sh
 ```
+
+`setup.sh` picks the right package manager for apt, dnf, pacman, zypper, apk and Homebrew, and the right Piper build for x86_64, aarch64, armv7l and Apple silicon.
 
 `configure.py` asks what the channel is about and writes `config.json`. `setup.ps1` / `setup.sh` installs ffmpeg, Ollama, the Python packages, Piper, a voice model and the language model.
 
@@ -137,7 +139,11 @@ python status.py
 Searches Pexels for the terms in `broll_queries`, one page deeper each run so the library keeps growing. Every clip is checked for brightness and re-encoded to one resolution and frame rate on the way in, which is why it is not instant. Rejected clip IDs are remembered so they are not downloaded twice. Writes to `assets/broll/`. Needs `pexels.key`.
 
 **`python vidbot.py`**
-Fetches candidate stories, skips any already used, downloads the article text, and refuses the story if too little text comes back rather than inventing one. Then writes narration with Ollama, speaks it with Piper, times captions with Whisper, and renders with ffmpeg. Writes `.txt`, `.wav`, `.ass`, `.mp4` and `.json` per video into `out/`. Records used stories in `state.db`.
+First it counts what is already waiting in `out/`. Uploads are capped at 6 a day, so if the queue is already full it makes nothing and says so. That is deliberate: making more than you can publish means every story goes out days after it happened, which is worthless on a news channel. `max_queue` in `config.json` controls the ceiling.
+
+Then it fetches candidate stories, skips any already used, downloads the article text, and refuses the story if too little text comes back rather than inventing one.
+
+Two stories count as the same if their headlines share the same significant words, so the same event picked up from a second feed, or reworded slightly, does not become a second video. Then writes narration with Ollama, speaks it with Piper, times captions with Whisper, and renders with ffmpeg. Writes `.txt`, `.wav`, `.ass`, `.mp4` and `.json` per video into `out/`. Records used stories in `state.db`.
 
 It uploads nothing. A story that fails is skipped and the next one is tried.
 
@@ -156,8 +162,9 @@ Runs `broll.py`, then `vidbot.py`, then `upload.py`, and tees everything into `l
 - Never uploads anything public unless you change `PRIVACY` in `upload.py`
 - Never deletes a video you made
 - Never uploads more than 6 a day, which is the YouTube API ceiling
-- Never covers the same story twice
+- Never covers the same story twice, even from a different site or reworded
 - Never writes about an article it could not read
+- Never builds a backlog. If 6 are already waiting it makes none
 
 ---
 
@@ -230,6 +237,7 @@ Change `broll_queries` to match the subject or the footage will not fit the word
 | `videos_per_run` | Videos per night. Start at 1 or 2 |
 | `target_words` | 150 words is about a minute of speech |
 | `min_article_chars` | Under this, skip the story instead of guessing at it |
+| `max_queue` | Stop making videos once this many are waiting. Keep it equal to the 6 a day upload limit so nothing publishes late |
 | `model` | Any Ollama model. `qwen3:14b` if you have the RAM |
 | `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
 | `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |

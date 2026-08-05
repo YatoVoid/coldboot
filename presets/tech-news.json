@@ -15,7 +15,7 @@
   "model": "qwen3:8b",
   "target_words": 1250,
   "videos_per_run": 2,
-  "min_article_chars": 1200,
+  "min_article_chars": 1200, "max_queue": 6,
 
   "width": 1920, "height": 1080, "fps": 30,
   "font": "auto", "bitrate": "8M", "encoder": "auto",
