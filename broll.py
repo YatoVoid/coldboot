@@ -11,7 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 BROLL = ROOT / "assets" / "broll"
 KEY = ROOT / "pexels.key"
-CFG = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+import settings
+CFG = settings.load()
 QUERIES = CFG["broll_queries"]
 PER_QUERY = CFG.get("broll_per_query", 4)
 

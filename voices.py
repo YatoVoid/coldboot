@@ -58,7 +58,8 @@ SAMPLE = ("Researchers released the model weights this week, and the interesting
 
 
 def cfg():
-    return json.loads(CONFIG.read_text(encoding="utf-8-sig"))
+    import settings
+    return settings.load()
 
 
 def voice_url(name):

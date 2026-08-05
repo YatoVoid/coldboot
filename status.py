@@ -84,7 +84,8 @@ def main():
     last_up = con.execute("SELECT MAX(ts) FROM uploaded").fetchone()[0]
     last_story = con.execute("SELECT MAX(ts) FROM seen").fetchone()[0]
     stories = con.execute("SELECT COUNT(*) FROM seen").fetchone()[0]
-    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+    import settings
+    cfg = settings.load()
 
     print()
     s = schedule()

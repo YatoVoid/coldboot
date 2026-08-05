@@ -1,0 +1,55 @@
+name: self-test
+
+# Runs every module's --demo the way a stranger gets the repo: a clean
+# checkout with no config.json. That is exactly the case that broke once,
+# where the demos worked here and crashed for anyone who cloned it.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  demos:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # the demos only need the light dependencies. whisper, kokoro and the
+      # google client are imported inside the functions that use them, so a
+      # self-test does not have to download hundreds of megabytes.
+      - name: install
+        run: python -m pip install --quiet "requests>=2.32,<3" "defusedxml>=0.7,<1"
+
+      - name: no config.json, as a fresh clone would be
+        shell: bash
+        run: test ! -f config.json
+
+      - name: self-tests
+        shell: bash
+        run: |
+          for m in settings sources configure vidbot broll upload status voices; do
+            echo "--- $m"
+            python $m.py --demo
+          done
+
+      - name: still fine once a config exists
+        shell: bash
+        run: |
+          cp config.example.json config.json
+          for m in settings sources configure vidbot broll upload status voices; do
+            python $m.py --demo
+          done
+
+      - name: presets are valid json and pass validation
+        run: python configure.py --check

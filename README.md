@@ -63,6 +63,8 @@ Check the install without changing anything:
 
 Setup creates `config.json` from `config.example.json` if you have not run `configure.py`. Your `config.json` is yours and is not tracked by git, so your settings never get overwritten by an update.
 
+Anything missing from your config falls back to the matching value in `config.example.json`. So an update that adds a new setting will not break a config you wrote months ago, and everything runs before you have made one at all. `python settings.py` prints what is in use and whether each value came from you or the default.
+
 ## 2. Pexels key
 
 Free, no card, takes two minutes. Sign up at <https://www.pexels.com/api/>, copy the key, and save it as `pexels.key` in this folder with nothing else in the file.
@@ -101,6 +103,7 @@ Run these from the project folder. On Linux use `python3`.
 | Command | What it does |
 |---|---|
 | `python status.py` | When the next run is, what is queued, what went up. Changes nothing |
+| `python settings.py` | Every setting in use, and whether it is yours or a default |
 | `python voices.py` | Lists the voices worth using and shows which one you have |
 | `python voices.py --try` | Renders a sample of each so you can listen and compare |
 | `python voices.py --set <name>` | Downloads that voice and puts it in `config.json` |
@@ -437,9 +440,10 @@ python broll.py     --demo
 python upload.py    --demo
 python status.py    --demo
 python voices.py    --demo
+python settings.py  --demo
 ```
 
-All seven should print `demo ok`. If they do, the code is fine and the problem is setup, keys or network.
+All eight should print `demo ok`, on a clean clone with no config yet. GitHub Actions runs them on every push across Windows, Linux and macOS on Python 3.10 and 3.13. If they do, the code is fine and the problem is setup, keys or network.
 
 ---
 

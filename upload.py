@@ -28,8 +28,8 @@ def privacy():
     to a real channel on its first night. That has to be a decision someone
     makes on purpose.
     """
-    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
-    want = cfg.get("privacy", "private")
+    import settings
+    want = settings.load().get("privacy", "private")
     return want if want in ("private", "unlisted", "public") else "private"
 
 
@@ -154,7 +154,8 @@ def probe_seconds(path):
 def upload_one(yt, mp4):
     from googleapiclient.http import MediaFileUpload
     meta = json.loads(mp4.with_suffix(".json").read_text(encoding="utf-8"))
-    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+    import settings
+    cfg = settings.load()
     body = {"snippet": {"title": meta["title"], "description": meta["description"],
                         "categoryId": cfg.get("youtube_category", "28")},
             "status": {"privacyStatus": privacy(), "selfDeclaredMadeForKids": False}}

@@ -6,11 +6,11 @@
 import json, os, random, re, sqlite3, subprocess, sys, time
 from pathlib import Path
 
+import settings
 import sources
 
 ROOT = Path(__file__).parent
-# utf-8-sig so a config saved by notepad or powershell keeps working
-CFG = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+CFG = settings.load()
 OUT = ROOT / "out"
 ASSETS = ROOT / "assets"
 BROLL = ASSETS / "broll"

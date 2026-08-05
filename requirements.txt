@@ -1,7 +1,10 @@
-requests
-defusedxml
-faster-whisper
-kokoro-onnx
-soundfile
-google-api-python-client
-google-auth-oauthlib
+# Floors, not exact pins. These are the versions this was built and tested
+# against, and the upper bound stops a major release breaking a machine that
+# runs unattended every night. Nobody notices a broken nightly job for days.
+requests>=2.32,<3
+defusedxml>=0.7,<1
+faster-whisper>=1.1,<2
+kokoro-onnx>=0.4,<1
+soundfile>=0.12,<1
+google-api-python-client>=2.150,<3
+google-auth-oauthlib>=1.2,<2
