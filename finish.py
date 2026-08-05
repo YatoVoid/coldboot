@@ -8,6 +8,19 @@ from pathlib import Path
 import vidbot as v
 
 
+def source_url(name):
+    """Find the story this video came from, so the description can credit it.
+
+    Repairing a video after a crash loses the story it came from, and an empty
+    source line under the video helps nobody.
+    """
+    con = v.db()
+    for url, title in con.execute("SELECT url, title FROM seen"):
+        if v.slug(title) == name:
+            return url
+    return ""
+
+
 def playable(path):
     """An interrupted write leaves a 0-byte or half-written file behind."""
     if not path.exists() or path.stat().st_size < 1024:
@@ -40,7 +53,7 @@ def finish_partial():
             if not playable(mp4):
                 v.stage("  render", v.render, wav, ass, mp4)
             if not js.exists():
-                story = {"title": name.replace("-", " "), "url": ""}
+                story = {"title": name.replace("-", " "), "url": source_url(name)}
                 meta = v.stage("  title + description", v.make_meta, story, script)
                 js.write_text(json.dumps(meta, indent=2), encoding="utf-8")
                 print(f'      -> "{meta["title"]}"', flush=True)

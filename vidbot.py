@@ -161,31 +161,77 @@ def write_script(story):
     return clean_script(r.json()["response"])
 
 
-META_PROMPT = """Video narration follows. Write YouTube metadata for it.
-Return ONLY a JSON object with keys "title" and "description".
-title: under 70 chars, concrete and specific, no clickbait punctuation, no emoji.
-description: 2-3 sentences of what the video covers.
----
+META_PROMPT = """Below is the narration of a YouTube video. Write its metadata.
+
+Reply with a JSON object and nothing else. No explanation, no code fence.
+Exactly this shape:
+
+{{"title": "...", "description": "..."}}
+
+title: under 70 characters, says what happened, no clickbait punctuation, no emoji.
+description: 2 to 3 full sentences covering what the video explains.
+
+NARRATION:
 {script}"""
 
 
-def make_meta(story, script):
-    """Separate call for the title. Falls back to the headline if the JSON is junk."""
-    import requests
-    fallback = {"title": story["title"][:95], "description": story["url"]}
+def parse_meta(raw):
+    """Pull the JSON object out of whatever the model replied with.
+
+    Small models wrap it in prose or a code fence, or emit single quotes and
+    trailing commas. Salvage what we can rather than throwing the call away.
+    """
+    raw = re.sub(r"^\s*```(?:json)?|```\s*$", "", raw.strip(), flags=re.M)
+    m = re.search(r"\{.*?\"title\".*?\}", raw, re.S)
+    if not m:
+        return {}
+    blob = re.sub(r",\s*([}\]])", r"\1", m.group(0))     # trailing commas
     try:
-        r = requests.post("http://localhost:11434/api/generate", timeout=600, json={
-            "model": CFG["model"], "prompt": META_PROMPT.format(script=script[:3000]),
-            "stream": False, "options": {"temperature": 0.7, "num_predict": 500}})
-        raw = clean_script(r.json()["response"])
-        m = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))
-        title = (m.get("title") or "").strip()
-        if not title:
-            return fallback
-        return {"title": title[:95],
-                "description": (m.get("description") or "").strip() + f"\n\nSource: {story['url']}"}
+        return json.loads(blob)
     except Exception:
-        return fallback
+        pass
+    # last resort: read the two fields straight out of the text
+    out = {}
+    for key in ("title", "description"):
+        f = re.search(rf'"{key}"\s*:\s*"(.*?)"\s*[,}}]', blob, re.S)
+        if f:
+            out[key] = f.group(1).replace('\\"', '"').strip()
+    return out
+
+
+def summarise(script, n=2):
+    """First couple of sentences of the narration, for when the model will not
+    produce a description. Beats putting a bare url in the box."""
+    parts = re.split(r"(?<=[.!?])\s+", script.strip())
+    return " ".join(parts[:n]).strip()
+
+
+def make_meta(story, script):
+    """Title and description in their own call, with two attempts.
+
+    A third of these used to fall back to the headline and a bare url, which
+    is what the viewer sees under the video, so it is worth retrying.
+    """
+    import requests
+    got = {}
+    for attempt in range(2):
+        try:
+            r = requests.post("http://localhost:11434/api/generate", timeout=600, json={
+                "model": CFG["model"],
+                "prompt": META_PROMPT.format(script=script[:3000]),
+                "stream": False,
+                "options": {"temperature": 0.4 if attempt else 0.7, "num_predict": 500}})
+            got = parse_meta(clean_script(r.json()["response"]))
+            if got.get("title") and got.get("description"):
+                break
+        except Exception:
+            continue
+
+    title = (got.get("title") or story["title"]).strip()[:95]
+    desc = (got.get("description") or summarise(script)).strip()
+    if story.get("url"):
+        desc += f"\n\nSource: {story['url']}"
+    return {"title": title, "description": desc}
 
 
 def clean_script(t):
@@ -366,6 +412,13 @@ def demo():
     a = clip_order(clips, 60, "story-0", d)
     assert a == clip_order(clips, 60, "story-0", d), "not reproducible"
     assert len(a) * 10 >= 60, "bed too short to cover the narration"
+
+    # models wrap the json in prose, fences, or trailing commas
+    assert parse_meta('{"title": "A", "description": "B"}')["title"] == "A"
+    assert parse_meta('```json\n{"title":"A","description":"B"}\n```')["title"] == "A"
+    assert parse_meta('Sure!\n{"title": "A", "description": "B",}')["description"] == "B"
+    assert parse_meta("no json here at all") == {}
+    assert summarise("One. Two. Three.") == "One. Two."
     print("demo ok")
 
 

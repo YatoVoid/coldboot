@@ -13,7 +13,7 @@ OUT = ROOT / "out"
 DONE = OUT / "uploaded"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 DAILY_CAP = 6
-PRIVACY = "private"          # flip to "public" once you've watched a few
+PRIVACY = "public"           # set to "private" if you want to review first
 
 # every file a video is made of, so they move together
 PARTS = (".mp4", ".json", ".txt", ".wav", ".ass")
