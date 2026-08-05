@@ -26,6 +26,12 @@ have() { command -v "$1" >/dev/null 2>&1; }
 MAC=0
 [ "$(uname -s)" = "Darwin" ] && MAC=1
 
+# config.json is yours and is not in the repo. start from the example.
+if [ ! -f "$ROOT/config.json" ]; then
+  cp "$ROOT/config.example.json" "$ROOT/config.json"
+  echo "created config.json from the example. run configure.py to change the subject."
+fi
+
 # which package manager, so this works past just ubuntu
 if [ "$MAC" = 1 ]; then
   if have brew; then PM="brew install"; UPDATE=":"

@@ -9,6 +9,11 @@ param([switch]$Check)
 $ErrorActionPreference = "Stop"
 $root  = $PSScriptRoot
 $piper = Join-Path $root "assets\piper"
+# config.json is yours and is not in the repo. start from the example.
+if (-not (Test-Path (Join-Path $root "config.json"))) {
+  Copy-Item (Join-Path $root "config.example.json") (Join-Path $root "config.json")
+  Write-Host "created config.json from the example. run configure.py to change the subject." -ForegroundColor Yellow
+}
 $cfg   = Get-Content (Join-Path $root "config.json") -Raw | ConvertFrom-Json
 $voice = $cfg.piper_voice
 $model = $cfg.model

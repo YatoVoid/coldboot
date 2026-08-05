@@ -109,8 +109,9 @@ def main():
     print(f"  clip library        {len(list(BROLL.glob('*.mp4')))} clips")
     kept = list(DONE.glob("*.mp4")) if DONE.exists() else []
     print(f"  kept in uploaded/   {len(kept)} videos, {gb(kept):.1f} GB")
+    vis = cfg.get("privacy", "private")
     print(f"\n  makes {cfg['videos_per_run']} videos a night, uploads as "
-          f"{'PUBLIC' if 'public' in (ROOT / 'upload.py').read_text() else 'private'}")
+          f"{vis.upper() if vis == 'public' else vis}")
     logs = sorted((ROOT / "logs").glob("*.log")) if (ROOT / "logs").exists() else []
     if logs:
         print(f"  newest log          logs\\{logs[-1].name}")

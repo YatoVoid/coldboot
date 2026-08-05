@@ -4,7 +4,7 @@ Makes narrated news videos on your own machine while you sleep.
 
 It picks stories off a feed you choose, reads the articles, writes narration with a local LLM, speaks it with Piper, times captions with Whisper, cuts it over free stock footage, and uploads to YouTube. Nothing runs in the cloud. Nothing charges you monthly.
 
-Every account it needs is free. Runs on Windows and Linux.
+Every account it needs is free. Runs on Windows, Linux and macOS.
 
 ## Before you bother
 
@@ -58,8 +58,10 @@ Check the install without changing anything:
 
 ```
 .\setup.ps1 -Check          # windows
-./setup.sh --check          # linux
+./setup.sh --check          # linux and macos
 ```
+
+Setup creates `config.json` from `config.example.json` if you have not run `configure.py`. Your `config.json` is yours and is not tracked by git, so your settings never get overwritten by an update.
 
 ## 2. Pexels key
 
@@ -109,8 +111,9 @@ Run these from the project folder. On Linux use `python3`.
 | `python broll.py --normalize` | Re-encodes the clip library to one format |
 | `python vidbot.py` | Makes videos. Does not upload |
 | `python upload.py` | Uploads what is waiting. Makes nothing |
-| `python finish.py` | Repairs half-built videos after a crash, then carries on |
-| `.\run_daily.ps1` / `./run_daily.sh` | All three stages: footage, videos, upload |
+| `python finish.py` | Repairs half-built videos after a crash, then makes more |
+| `python finish.py --only-partial` | Repairs only, makes nothing new |
+| `.\run_daily.ps1` / `./run_daily.sh` | All four stages: repair, footage, videos, upload |
 | `<script> --demo` | Self-test. No network, no keys, no models, changes nothing |
 
 ## Checking on it
@@ -150,12 +153,12 @@ It uploads nothing. A story that fails is skipped and the next one is tried.
 **`python upload.py`**
 Uploads everything waiting in `out/`, up to 6 a day. Prints percentage, speed and time left as it goes. After each success it records the video in `state.db` and **moves the video and its files into `out/uploaded/`**. Nothing is deleted, ever. You decide what to keep.
 
-Videos go up **private**. They appear in YouTube Studio under Content, marked Private, visible to you and nobody else.
+Videos go up **private** until you say otherwise, set by `privacy` in `config.json`. Private ones appear in YouTube Studio under Content, visible to you and nobody else. See "Going public" below.
 
 Only one copy runs at a time. It writes `upload.lock` while working and refuses to start if another upload is already going, because two uploaders reading the same folder both see the same queue and put every video on the channel twice. If a run is killed the lock is left behind, and the next run notices the process is gone and clears it.
 
 **`run_daily.ps1` / `run_daily.sh`**
-Runs `broll.py`, then `vidbot.py`, then `upload.py`, and tees everything into `logs/`.
+Four stages, tee'd into `logs/`: repair anything left half done, top up footage, make videos, upload. Repair goes first so a run cut short last night is finished before new work starts.
 
 ## If the power cuts out mid-run
 
@@ -181,7 +184,7 @@ The one thing worth having is a UPS, or just running on a laptop. A battery turn
 
 ## What it never does
 
-- Never uploads anything public unless you change `PRIVACY` in `upload.py`
+- Never uploads anything public unless you set `privacy` in `config.json`
 - Never deletes a video you made
 - Never uploads more than 6 a day, which is the YouTube API ceiling
 - Never covers the same story twice, even from a different site or reworded
@@ -195,7 +198,8 @@ The one thing worth having is a UPS, or just running on a laptop. A battery turn
 # Where things end up
 
 ```
-config.json          what the channel is about
+config.json          your settings, not tracked by git
+config.example.json  the starting point setup copies from
 pexels.key           your key, never committed
 client_secret.json   your google credentials, never committed
 token.json           your login, written on first upload, never committed
@@ -266,9 +270,10 @@ Change `broll_queries` to match the subject or the footage will not fit the word
 | `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
 | `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |
 | `encoder` | `auto` test-encodes a few frames and picks what works. Force with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
-| `font` | `auto` means Arial on Windows, DejaVu Sans on Linux |
+| `font` | `auto` means Arial on Windows, DejaVu Sans elsewhere |
 | `youtube_category` | 28 science and tech, 20 gaming, 25 news, 27 education |
 | `min_brightness` | Clips darker than this are thrown away |
+| `privacy` | `private`, `unlisted` or `public`. Starts private on purpose |
 
 ---
 
@@ -315,13 +320,19 @@ Cron gets a bare PATH, so add `PATH=` at the top of the crontab if ollama or ffm
 
 ## Going public
 
-Videos upload private on purpose. Watch a few. When you are happy, edit `upload.py`:
+Videos upload private on purpose, so the first thing a fresh install does is not publish unreviewed video to a real channel.
 
-```python
-PRIVACY = "public"
+Watch a few. When you are happy, set this in `config.json`:
+
+```json
+"privacy": "public"
 ```
 
-Only new uploads are affected. Change the earlier ones in YouTube Studio.
+`private`, `unlisted` and `public` all work. Anything else is treated as `private`.
+
+Only new uploads are affected. Change earlier ones in YouTube Studio.
+
+Be clear with yourself about what this switch means. After it, a machine writes and publishes to your audience nightly with nobody reading it first. If a script gets a fact wrong, it is wrong in public under your name. That is a reasonable trade, but make it on purpose.
 
 ---
 
@@ -342,17 +353,22 @@ Only new uploads are affected. Change the earlier ones in YouTube Studio.
 | `bad interpreter: ^M` | The .sh got CRLF endings. `sed -i 's/\r$//' *.sh` |
 | `externally-managed-environment` | Debian pip guard. setup.sh retries with `--break-system-packages` |
 | No captions on Linux | `sudo apt install fonts-dejavu` |
+| `config.json` not found | Run `python configure.py`, or copy `config.example.json` over it |
+| Uploads went public unexpectedly | `privacy` in `config.json`. It ships as `private` |
 | Nothing ran overnight | Machine was asleep |
 
 Every script has a self-test that needs no network, no keys and no models:
 
 ```
-python vidbot.py --demo
-python sources.py --demo
+python vidbot.py    --demo
+python sources.py   --demo
 python configure.py --demo
-python broll.py --demo
-python upload.py --demo
+python broll.py     --demo
+python upload.py    --demo
+python status.py    --demo
 ```
+
+All six should print `demo ok`. If they do, the code is fine and the problem is setup, keys or network.
 
 ---
 

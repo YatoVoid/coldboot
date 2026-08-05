@@ -6,6 +6,9 @@ token.json
 *secret*.json
 
 # ---- personal / machine state ----
+# your own settings, including whether uploads go public.
+# config.example.json is the shipped starting point.
+config.json
 state.db
 logs/
 out/

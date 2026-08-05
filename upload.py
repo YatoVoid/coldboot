@@ -13,13 +13,24 @@ OUT = ROOT / "out"
 DONE = OUT / "uploaded"
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 DAILY_CAP = 6
-PRIVACY = "public"           # set to "private" if you want to review first
 
 # every file a video is made of, so they move together
 PARTS = (".mp4", ".json", ".txt", ".wav", ".ass")
 
 
 LOCK = ROOT / "upload.lock"
+
+
+def privacy():
+    """private unless the config says otherwise.
+
+    Defaulting to public would mean a fresh clone publishes unreviewed video
+    to a real channel on its first night. That has to be a decision someone
+    makes on purpose.
+    """
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
+    want = cfg.get("privacy", "private")
+    return want if want in ("private", "unlisted", "public") else "private"
 
 
 def take_lock():
@@ -146,7 +157,7 @@ def upload_one(yt, mp4):
     cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8-sig"))
     body = {"snippet": {"title": meta["title"], "description": meta["description"],
                         "categoryId": cfg.get("youtube_category", "28")},
-            "status": {"privacyStatus": PRIVACY, "selfDeclaredMadeForKids": False}}
+            "status": {"privacyStatus": privacy(), "selfDeclaredMadeForKids": False}}
     # 4MB chunks rather than one shot, so a 400MB file can report progress.
     # Sending it in a single request looks identical to a hang for minutes.
     media = MediaFileUpload(str(mp4), chunksize=4 * 1024 * 1024, resumable=True)
@@ -206,7 +217,8 @@ def main():
     todo = pending(con)[:left]
     if not todo:
         return print("Nothing pending.")
-    print(f"{len(pending(con))} ready, uploading {len(todo)} today "
+    print(f"{len(pending(con))} ready, uploading {len(todo)} today as "
+          f"{privacy().upper()} "
           f"({sum(p.stat().st_size for p in todo) / 1e9:.1f}GB). This is slow.")
     yt = service()
     for i, mp4 in enumerate(todo, 1):
@@ -222,7 +234,7 @@ def main():
                         (mp4.name, vid, int(time.time())))
             con.commit()
             n = archive(mp4)
-            print(f"      {PRIVACY}: https://youtu.be/{vid}")
+            print(f"      {privacy()}: https://youtu.be/{vid}")
             print(f"      moved {n} files to out/uploaded/")
         except Exception as e:
             print(f"      FAILED: {type(e).__name__}: {str(e)[:300]}")
