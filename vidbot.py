@@ -71,8 +71,35 @@ def pick_font():
 
 def db():
     c = sqlite3.connect(ROOT / "state.db")
+    # write-ahead logging survives a power cut mid-write far better than the
+    # default journal, and this machine is expected to lose power sometimes.
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA synchronous=FULL")
     c.execute("CREATE TABLE IF NOT EXISTS seen (url TEXT PRIMARY KEY, title TEXT, ts INT)")
     return c
+
+
+def write_atomic(path, text):
+    """Write to a temp name and rename over the target.
+
+    Rename is atomic, so a power cut leaves either the old file or the new one,
+    never a half written one that later looks finished.
+    """
+    tmp = path.with_suffix(path.suffix + ".part")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def complete(name):
+    """A video counts as finished only with a playable mp4 and its metadata."""
+    mp4, js = OUT / f"{name}.mp4", OUT / f"{name}.json"
+    if not (mp4.exists() and js.exists()):
+        return False
+    try:
+        return duration(mp4) > 5
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------- sourcing
@@ -270,8 +297,10 @@ def narrate(text, wav):
         env = dict(os.environ,
                    LD_LIBRARY_PATH=str(PIPER.parent),
                    DYLD_LIBRARY_PATH=str(PIPER.parent))
-    subprocess.run([str(PIPER), "-m", str(voice), "-f", str(wav), "--sentence-silence", "0.35"],
+    part = wav.with_suffix(".wav.part")
+    subprocess.run([str(PIPER), "-m", str(voice), "-f", str(part), "--sentence-silence", "0.35"],
                    input=text.encode("utf-8"), check=True, env=env)
+    part.replace(wav)
     return wav
 
 
@@ -306,8 +335,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         ch = words[i:i + 4]
         txt = " ".join(w.word.strip() for w in ch).replace("\n", " ")
         lines.append(f"Dialogue: 0,{ass_time(ch[0].start)},{ass_time(ch[-1].end)},D,,0,0,0,,{txt}")
-    ass_path.write_text(head + "\n".join(lines) + "\n", encoding="utf-8")
-    return ass_path
+    return write_atomic(ass_path, head + "\n".join(lines) + "\n")
 
 
 # ---------------------------------------------------------------- render
@@ -364,12 +392,16 @@ def render(wav, ass, mp4):
           f"crop={CFG['width']}:{CFG['height']},fps={CFG['fps']},"
           f"ass={ass.name}")
     enc = pick_encoder()
+    part = mp4.with_suffix(".mp4.part")
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", bed.name, "-i", wav.name,
                     "-vf", vf, "-map", "0:v", "-map", "1:a", "-shortest",
                     "-c:v", enc, *ENC_ARGS.get(enc, []),
                     "-b:v", CFG.get("bitrate", "8M"),
-                    "-c:a", "aac", "-b:a", "192k", mp4.name],
+                    "-c:a", "aac", "-b:a", "192k", part.name],
                    check=True, cwd=str(OUT))
+    # only now does the real filename exist, so a crash mid-encode cannot leave
+    # something that looks like a finished video
+    part.replace(mp4)
     return mp4
 
 
@@ -397,14 +429,15 @@ def make_one(story):
     else:
         print("    reading article + writing script (slowest step, 3-8 min)", flush=True)
         script = stage("  script", write_script, story)
-        txt.write_text(script, encoding="utf-8")
+        write_atomic(txt, script)
     words = len(script.split())
     print(f"      -> {words} words, about {words / 150:.1f} min of speech", flush=True)
     wav = stage("  voice", narrate, script, OUT / f"{name}.wav")
     ass = stage("  subtitles", make_subs, wav, OUT / f"{name}.ass")
     mp4 = stage("  render", render, wav, ass, OUT / f"{name}.mp4")
     meta = stage("  title + description", make_meta, story, script)
-    (OUT / f"{name}.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    # json last, so its presence is what marks the video as finished
+    write_atomic(OUT / f"{name}.json", json.dumps(meta, indent=2))
     print(f"      -> \"{meta['title']}\"", flush=True)
     mark_done(story)
     return mp4
@@ -454,7 +487,10 @@ def main():
     # only make what can actually go out. uploads are capped at 6 a day, so
     # making 6 a night on top of a queue means every story publishes days late.
     # out/ holds only un-uploaded videos, finished ones move to out/uploaded/.
-    queued = len([p for p in OUT.glob("*.mp4") if not p.name.startswith("_")])
+    # only finished ones count. a video left half rendered by a power cut must
+    # not occupy a queue slot forever and stop new ones being made.
+    queued = len([p for p in OUT.glob("*.mp4")
+                  if not p.name.startswith("_") and complete(p.stem)])
     room = max(0, CFG.get("max_queue", 6) - queued)
     want = min(CFG["videos_per_run"], room)
     if want == 0:

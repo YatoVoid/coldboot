@@ -57,6 +57,8 @@ def pid_alive(pid):
 
 def db():
     c = sqlite3.connect(ROOT / "state.db")
+    c.execute("PRAGMA journal_mode=WAL")      # survive a power cut mid write
+    c.execute("PRAGMA synchronous=FULL")
     c.execute("CREATE TABLE IF NOT EXISTS uploaded (file TEXT PRIMARY KEY, vid TEXT, ts INT)")
     return c
 
@@ -109,6 +111,33 @@ def service():
                 creds = flow.run_local_server(port=0)
         tok.write_text(creds.to_json())
     return build("youtube", "v3", credentials=creds)
+
+
+def usable(mp4):
+    """Refuse to publish a video that is shorter than its own narration.
+
+    A crash mid render used to leave a playable but truncated file. Publishing
+    one is worse than skipping it, because it goes out under your name.
+    """
+    wav = mp4.with_suffix(".wav")
+    try:
+        vid = probe_seconds(mp4)
+        if vid < 5:
+            return "video is empty"
+        if wav.exists():
+            aud = probe_seconds(wav)
+            if aud - vid > 2:
+                return f"video is {vid:.0f}s but narration is {aud:.0f}s"
+    except Exception as e:
+        return f"unreadable ({type(e).__name__})"
+    return ""
+
+
+def probe_seconds(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                          "format=duration", "-of", "csv=p=0", str(path)],
+                         capture_output=True, text=True, check=True)
+    return float(out.stdout.strip())
 
 
 def upload_one(yt, mp4):
@@ -182,6 +211,11 @@ def main():
     yt = service()
     for i, mp4 in enumerate(todo, 1):
         print(f"  [{i}/{len(todo)}] {mp4.name[:56]}", flush=True)
+        why = usable(mp4)
+        if why:
+            print(f"      SKIPPED, not publishing: {why}")
+            print(f"      run finish.py to rebuild it")
+            continue
         try:
             vid = upload_one(yt, mp4)
             con.execute("INSERT OR REPLACE INTO uploaded VALUES (?,?,?)",

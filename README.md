@@ -157,6 +157,28 @@ Only one copy runs at a time. It writes `upload.lock` while working and refuses 
 **`run_daily.ps1` / `run_daily.sh`**
 Runs `broll.py`, then `vidbot.py`, then `upload.py`, and tees everything into `logs/`.
 
+## If the power cuts out mid-run
+
+Nothing is lost and nothing broken gets published. Turn the machine back on and it sorts itself out on the next run.
+
+Every file is written under a temporary name and renamed into place at the end. A rename either happens or it does not, so a power cut leaves the previous file or nothing, never a half written one pretending to be finished.
+
+What survives depends on how far it got:
+
+| Cut during | What happens next run |
+|---|---|
+| Writing the script | Story was never marked as covered, so it is picked again |
+| Speaking the narration | Script is kept, audio is re-recorded. The slow LLM step is not repeated |
+| Rendering | Script and audio kept, only the render is redone |
+| After render, before metadata | `finish.py` writes the metadata and it uploads normally |
+| Uploading | Nothing is recorded until YouTube confirms, so it re-uploads from the start. No duplicate, no half video |
+
+`run_daily` repairs leftovers before it does anything else, so this needs no command from you.
+
+Two extra guards. Before publishing, a video is compared against its own narration and skipped if it is shorter, because a truncated video is still a playable file and publishing one is worse than waiting a day. And the database uses write-ahead logging with full syncing, so a cut during a write does not corrupt the record of what has been covered and uploaded.
+
+The one thing worth having is a UPS, or just running on a laptop. A battery turns a power cut into nothing at all.
+
 ## What it never does
 
 - Never uploads anything public unless you change `PRIVACY` in `upload.py`
@@ -165,6 +187,8 @@ Runs `broll.py`, then `vidbot.py`, then `upload.py`, and tees everything into `l
 - Never covers the same story twice, even from a different site or reworded
 - Never writes about an article it could not read
 - Never builds a backlog. If 6 are already waiting it makes none
+- Never publishes a video shorter than its own narration
+- Never leaves a half written file behind a real filename
 
 ---
 

@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $root "logs") | Out-Null
 $log = Join-Path $root ("logs\" + (Get-Date -Format "yyyy-MM-dd_HHmm") + ".log")
 
 function Stage($n, $title) {
-  $line = "  [$n/3] $title  -  $(Get-Date -Format 'HH:mm:ss')"
+  $line = "  [$n/4] $title  -  $(Get-Date -Format 'HH:mm:ss')"
   Write-Host ""
   Write-Host "==================================================" -ForegroundColor Cyan
   Write-Host $line -ForegroundColor Cyan
@@ -21,13 +21,18 @@ function Stage($n, $title) {
 $t0 = Get-Date
 Write-Host "Cold Boot daily run - logging to $log" -ForegroundColor White
 
-Stage 1 "Topping up stock footage"
+# leftovers first. a run cut short by a power failure leaves a video with its
+# script and audio done but no render, and those are cheap to finish.
+Stage 1 "Repairing anything left half done"
+python (Join-Path $root "finish.py") --only-partial 2>&1 | Tee-Object -FilePath $log -Append
+
+Stage 2 "Topping up stock footage"
 python (Join-Path $root "broll.py")  2>&1 | Tee-Object -FilePath $log -Append
 
-Stage 2 "Making videos (the slow part - minutes per video)"
+Stage 3 "Making videos (the slow part - minutes per video)"
 python (Join-Path $root "vidbot.py") 2>&1 | Tee-Object -FilePath $log -Append
 
-Stage 3 "Uploading to YouTube"
+Stage 4 "Uploading to YouTube"
 python (Join-Path $root "upload.py") 2>&1 | Tee-Object -FilePath $log -Append
 
 $mins = [math]::Round(((Get-Date) - $t0).TotalMinutes, 1)
