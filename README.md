@@ -65,6 +65,8 @@ Setup creates `config.json` from `config.example.json` if you have not run `conf
 
 Anything missing from your config falls back to the matching value in `config.example.json`. So an update that adds a new setting will not break a config you wrote months ago, and everything runs before you have made one at all. `python settings.py` prints what is in use and whether each value came from you or the default.
 
+That fallback is top level only. Your `source` block is taken exactly as written rather than merged, because an `rss` block merged onto the `hackernews` default would pick up `min_points`, which means nothing for a feed. Settings read from inside `source` carry their own defaults instead.
+
 ## 2. Pexels key
 
 Free, no card, takes two minutes. Sign up at <https://www.pexels.com/api/>, copy the key, and save it as `pexels.key` in this folder with nothing else in the file.
@@ -441,9 +443,10 @@ python upload.py    --demo
 python status.py    --demo
 python voices.py    --demo
 python settings.py  --demo
+python finish.py    --demo
 ```
 
-All eight should print `demo ok`, on a clean clone with no config yet. GitHub Actions runs them on every push across Windows, Linux and macOS on Python 3.10 and 3.13. If they do, the code is fine and the problem is setup, keys or network.
+All nine should print `demo ok`, on a clean clone with no config yet. GitHub Actions runs them on every push across Windows, Linux and macOS on Python 3.10 and 3.13. If they do, the code is fine and the problem is setup, keys or network.
 
 ---
 

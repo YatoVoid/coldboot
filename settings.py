@@ -22,6 +22,17 @@ def read(path):
 
 
 def merge(defaults, user):
+    """Top level only, on purpose.
+
+    A deep merge would look tidier but it is wrong for the one nested block
+    here. "source" means different things depending on its type: an rss block
+    merged onto the hackernews default would inherit min_points, which means
+    nothing for a feed. Better an rss block is exactly what you wrote.
+
+    So the fallback covers top level keys. Anything read from inside "source"
+    uses .get with its own default, which is where that guarantee actually
+    lives. See sources.py.
+    """
     out = dict(defaults)
     out.update(user)
     return out
@@ -41,6 +52,11 @@ def demo():
     assert merge(d, {}) == d
     assert merge(d, u)["a"] == 1, "keys missing from a user config keep the default"
     assert merge(d, u) is not d, "must not edit the defaults in place"
+    # nested blocks are taken whole, so an rss source does not inherit
+    # hackernews settings that would mean nothing to it
+    hn = {"source": {"type": "hackernews", "min_points": 80}}
+    rss = {"source": {"type": "rss", "feeds": ["x"]}}
+    assert merge(hn, rss)["source"] == {"type": "rss", "feeds": ["x"]}
     print("demo ok")
 
 

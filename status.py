@@ -37,13 +37,25 @@ def gb(paths):
     return sum(p.stat().st_size for p in paths) / 1e9
 
 
+def ask(cmd):
+    """Run a scheduler command, or return None if the machine has not got it.
+
+    Plenty of linux installs have no crontab binary at all, and asking for one
+    that is missing raises rather than returning an error code. Reporting
+    status is not worth a traceback.
+    """
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except (FileNotFoundError, OSError, subprocess.SubprocessError):
+        return None
+
+
 def schedule():
     """Next run and last result, straight from the scheduler."""
     if sys.platform == "win32":
         for name in TASKS:
-            r = subprocess.run(["schtasks", "/query", "/tn", name, "/fo", "list", "/v"],
-                               capture_output=True, text=True)
-            if r.returncode:
+            r = ask(["schtasks", "/query", "/tn", name, "/fo", "list", "/v"])
+            if r is None or r.returncode:
                 continue
             got = {}
             for line in r.stdout.splitlines():
@@ -56,7 +68,9 @@ def schedule():
                     "result": got.get("Last Result", "?"),
                     "state": got.get("Scheduled Task State", got.get("Status", "?"))}
         return None
-    r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    r = ask(["crontab", "-l"])
+    if r is None:
+        return None
     for line in r.stdout.splitlines():
         if "run_daily.sh" in line and not line.strip().startswith("#"):
             return {"name": "cron", "next": line.split()[0:5], "last": "?",

@@ -35,10 +35,28 @@ jobs:
         shell: bash
         run: test ! -f config.json
 
+      # an unquoted >= in a shell command writes a file called 0.7 and git add
+      # -A commits it. that has happened twice, so stop asking people to be
+      # careful and just fail the build.
+      - name: no empty or junk files committed
+        shell: bash
+        run: |
+          bad=0
+          while read -r f; do
+            if [ ! -s "$f" ]; then echo "empty file tracked: $f"; bad=1; fi
+          done < <(git ls-files)
+          while read -r f; do
+            case "$f" in
+              *.py|*.md|*.json|*.txt|*.ps1|*.sh|*.yml|LICENSE|.gitignore|.gitattributes) ;;
+              *) echo "unexpected file tracked: $f"; bad=1 ;;
+            esac
+          done < <(git ls-files)
+          exit $bad
+
       - name: self-tests
         shell: bash
         run: |
-          for m in settings sources configure vidbot broll upload status voices; do
+          for m in settings sources configure vidbot broll upload status voices finish; do
             echo "--- $m"
             python $m.py --demo
           done
@@ -47,7 +65,7 @@ jobs:
         shell: bash
         run: |
           cp config.example.json config.json
-          for m in settings sources configure vidbot broll upload status voices; do
+          for m in settings sources configure vidbot broll upload status voices finish; do
             python $m.py --demo
           done
 

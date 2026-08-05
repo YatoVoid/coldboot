@@ -66,8 +66,27 @@ def finish_partial():
     return done
 
 
+def demo():
+    """No network, no models, and nothing on disk is touched."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        empty = Path(d) / "nothing.mp4"
+        assert not playable(empty), "a file that is not there is not playable"
+        empty.write_bytes(b"")
+        assert not playable(empty), "a zero byte file is not playable"
+        empty.write_bytes(b"x" * 40)
+        assert not playable(empty), "40 bytes of junk is not a video"
+    assert source_url("a-story-that-was-never-covered") == ""
+    print("demo ok")
+
+
 if __name__ == "__main__":
-    v.OUT.mkdir(exist_ok=True)
-    finish_partial()
-    if "--only-partial" not in sys.argv:
-        v.main()
+    # checked before anything runs. this used to fall through to vidbot's own
+    # main, so --demo repaired videos for real and then printed ok by accident.
+    if "--demo" in sys.argv:
+        demo()
+    else:
+        v.OUT.mkdir(exist_ok=True)
+        finish_partial()
+        if "--only-partial" not in sys.argv:
+            v.main()
