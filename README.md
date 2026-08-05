@@ -157,6 +157,8 @@ logs/                one file per run
 
 Each video is five files sharing a name: `.txt` the script, `.wav` the narration, `.ass` the captions, `.mp4` the video, `.json` the title and description. They move to `out/uploaded/` together.
 
+**Worth backing up.** If you ever wipe the machine, the code comes back from git but these do not: `pexels.key`, `client_secret.json`, `token.json` and `state.db`. Losing `state.db` means it forgets which stories it covered and which videos went up, so it will cover old ground again. Copy those four somewhere safe.
+
 **Disk fills up.** Six videos a night at the default bitrate is roughly 1 GB a day, and nothing is removed automatically. Empty `out/uploaded/` yourself when you want the space back. Deleting from there is safe; `state.db` remembers what already went up, so nothing gets re-uploaded.
 
 ---
@@ -224,11 +226,31 @@ Windows:
 ```powershell
 $a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File `"$PWD\run_daily.ps1`""
 $t = New-ScheduledTaskTrigger -Daily -At 2:00AM
-$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 6)
+$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
+     -DontStopIfGoingOnBatteries -WakeToRun -RestartCount 2 `
+     -RestartInterval (New-TimeSpan -Minutes 30) `
+     -ExecutionTimeLimit (New-TimeSpan -Hours 6)
 Register-ScheduledTask -TaskName "coldboot-daily" -Action $a -Trigger $t -Settings $s -Force
 ```
 
-The machine has to be awake. Task Scheduler will not wake it. While plugged in: `powercfg /change standby-timeout-ac 0`.
+What those settings buy you:
+
+- `WakeToRun` wakes the machine from sleep at 2am. It cannot wake it from a full shutdown, nothing can.
+- `StartWhenAvailable` runs a missed job as soon as the machine is next up, so a night switched off is caught up on rather than skipped.
+- The battery flags let it start and keep running on battery.
+- `RestartCount` retries twice, half an hour apart, if the run fails.
+
+The task survives reboots. It is stored by Windows, not by this folder.
+
+By default the task runs only while your user is logged on. A locked screen is fine, but if you sign out it waits. To run regardless, open Task Scheduler, find the task, and pick "Run whether user is logged on or not".
+
+Check on it any time:
+
+```powershell
+Get-ScheduledTaskInfo -TaskName "coldboot-daily"
+```
+
+`LastTaskResult` of 0 means the last run succeeded.
 
 Linux, in `crontab -e`:
 
