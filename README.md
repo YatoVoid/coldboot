@@ -101,6 +101,9 @@ Run these from the project folder. On Linux use `python3`.
 | Command | What it does |
 |---|---|
 | `python status.py` | When the next run is, what is queued, what went up. Changes nothing |
+| `python voices.py` | Lists the voices worth using and shows which one you have |
+| `python voices.py --try` | Renders a sample of each so you can listen and compare |
+| `python voices.py --set <name>` | Downloads that voice and puts it in `config.json` |
 | `python configure.py` | Asks what the channel is about, writes `config.json` |
 | `python configure.py space` | Loads a preset without asking anything |
 | `python configure.py --list` | Lists the presets |
@@ -159,6 +162,52 @@ Only one copy runs at a time. It writes `upload.lock` while working and refuses 
 
 **`run_daily.ps1` / `run_daily.sh`**
 Four stages, tee'd into `logs/`: repair anything left half done, top up footage, make videos, upload. Repair goes first so a run cut short last night is finished before new work starts.
+
+## Picking a voice
+
+The default sounds like a newsreader, which gets tiring across eight minutes. Hear the alternatives on your own writing:
+
+```
+python voices.py --try
+```
+
+That downloads a shortlist, reads 70 words of one of your actual scripts in each, and drops the wavs in `out/voices/`. Play them, then:
+
+```
+python voices.py --set en_US-lessac-high
+```
+
+New videos use it. Existing ones keep the voice they were made with.
+
+Worth knowing what each is like:
+
+| Voice | Sounds like |
+|---|---|
+| `en_US-lessac-high` | US male, warm and even. easiest to listen to for a long video |
+| `en_US-hfc_female-medium` | US female, conversational, least announcer-like |
+| `en_US-hfc_male-medium` | US male, relaxed |
+| `en_GB-cori-high` | UK female, measured |
+| `en_GB-alan-medium` | UK male, quiet and dry |
+| `en_US-ryan-high` | US male, clipped news read. the old default |
+
+`high` in the name means a bigger model and better audio. It costs a little more time per video and is worth it.
+
+There are hundreds more at [the Piper voice list](https://huggingface.co/rhasspy/piper-voices), including many languages. Any of them works, name it exactly as the file is named and `--set` will fetch it.
+
+### Pacing matters as much as the voice
+
+Two settings in `config.json` do more for the robot problem than switching voice:
+
+| Key | Effect |
+|---|---|
+| `speech_rate` | Above 1 is slower. `1.05` to `1.15` sounds notably more human. Below 1 rushes |
+| `sentence_silence` | Seconds of pause between sentences. `0.45` gives it room to breathe |
+
+Rushed delivery with no pauses is most of what reads as synthetic. Slow it down before you blame the voice.
+
+### If it still is not good enough
+
+Piper is fast, free and runs offline, and that is the trade. It will not match a paid cloud voice. If you want a real step up and can spend the setup effort, [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) is also free, also local, and sounds considerably more natural. It would mean replacing the `narrate` function in `vidbot.py`, which is about twenty lines.
 
 ## If the power cuts out mid-run
 
@@ -267,7 +316,9 @@ Change `broll_queries` to match the subject or the footage will not fit the word
 | `min_article_chars` | Under this, skip the story instead of guessing at it |
 | `max_queue` | Stop making videos once this many are waiting. Keep it equal to the 6 a day upload limit so nothing publishes late |
 | `model` | Any Ollama model. `qwen3:14b` if you have the RAM |
-| `piper_voice` | Any [Piper voice](https://huggingface.co/rhasspy/piper-voices). Setup downloads whichever you name |
+| `piper_voice` | Set it with `voices.py`, or name any [Piper voice](https://huggingface.co/rhasspy/piper-voices) |
+| `speech_rate` | Above 1 is slower. `1.05` to `1.15` sounds more human |
+| `sentence_silence` | Pause between sentences in seconds. `0.45` is a good start |
 | `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |
 | `encoder` | `auto` test-encodes a few frames and picks what works. Force with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |
 | `font` | `auto` means Arial on Windows, DejaVu Sans elsewhere |
@@ -356,6 +407,7 @@ Be clear with yourself about what this switch means. After it, a machine writes 
 | `config.json` not found | Run `python configure.py`, or copy `config.example.json` over it |
 | Uploads went public unexpectedly | `privacy` in `config.json`. It ships as `private` |
 | Nothing ran overnight | Machine was asleep |
+| Voice sounds robotic | Try `python voices.py --try`, and raise `speech_rate` to 1.1 |
 
 Every script has a self-test that needs no network, no keys and no models:
 
@@ -366,9 +418,10 @@ python configure.py --demo
 python broll.py     --demo
 python upload.py    --demo
 python status.py    --demo
+python voices.py    --demo
 ```
 
-All six should print `demo ok`. If they do, the code is fine and the problem is setup, keys or network.
+All seven should print `demo ok`. If they do, the code is fine and the problem is setup, keys or network.
 
 ---
 

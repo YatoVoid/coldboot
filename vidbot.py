@@ -298,7 +298,12 @@ def narrate(text, wav):
                    LD_LIBRARY_PATH=str(PIPER.parent),
                    DYLD_LIBRARY_PATH=str(PIPER.parent))
     part = wav.with_suffix(".wav.part")
-    subprocess.run([str(PIPER), "-m", str(voice), "-f", str(part), "--sentence-silence", "0.35"],
+    # length-scale above 1 slows the delivery down, which is most of what makes
+    # a synthetic voice easier to sit through. sentence-silence is the pause
+    # between sentences, and rushing those is what makes it sound like a robot.
+    subprocess.run([str(PIPER), "-m", str(voice), "-f", str(part),
+                    "--sentence-silence", str(CFG.get("sentence_silence", 0.4)),
+                    "--length-scale", str(CFG.get("speech_rate", 1.0))],
                    input=text.encode("utf-8"), check=True, env=env)
     part.replace(wav)
     return wav

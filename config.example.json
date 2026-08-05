@@ -21,6 +21,8 @@
   "font": "auto", "bitrate": "8M", "encoder": "auto",
 
   "piper_voice": "en_US-ryan-high",
+  "speech_rate": 1.05,
+  "sentence_silence": 0.45,
   "whisper_model": "base.en",
   "youtube_category": "28"
 }
