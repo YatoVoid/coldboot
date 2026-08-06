@@ -29,7 +29,7 @@
     "data center corridor",
     "robot arm"
   ],
-  "broll_per_query": 3,
+  "broll_per_query": 5,
   "model": "qwen3:8b",
   "target_words": 1250,
   "videos_per_run": 2,

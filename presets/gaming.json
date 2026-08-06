@@ -23,7 +23,7 @@
     "vr headset",
     "server room"
   ],
-  "broll_per_query": 4,
+  "broll_per_query": 5,
   "model": "qwen3:8b",
   "target_words": 1100,
   "videos_per_run": 2,
