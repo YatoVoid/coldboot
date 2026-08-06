@@ -2,29 +2,52 @@
   "niche": "AI and technology news explainers",
   "audience": "English-speaking US/UK tech-curious adults",
   "angle": "Explain what actually happened and why it matters, with a real opinion. Never hype, never listicle filler.",
-
-  "source": { "type": "hackernews", "min_points": 80, "limit": 50 },
-
+  "source": {
+    "type": "hackernews",
+    "min_points": 80,
+    "limit": 50
+  },
   "broll_queries": [
-    "server room", "data center", "circuit board", "programming code",
-    "abstract technology", "city night timelapse", "robot arm",
-    "network cables", "artificial intelligence", "computer chip"
+    "developer working laptop",
+    "hands typing keyboard",
+    "office team meeting",
+    "whiteboard diagram",
+    "coffee shop laptop",
+    "conference talk audience",
+    "city street commuters",
+    "aerial city traffic",
+    "warehouse robotics",
+    "factory assembly line",
+    "shipping port containers",
+    "satellite earth orbit",
+    "wind turbine field",
+    "electric car charging",
+    "library reading",
+    "server room",
+    "circuit board macro",
+    "programming code screen",
+    "data center corridor",
+    "robot arm"
   ],
-  "broll_per_query": 4,
-
+  "broll_per_query": 3,
   "model": "qwen3:8b",
   "target_words": 1250,
   "videos_per_run": 2,
-  "min_article_chars": 1200, "max_queue": 6, "privacy": "private",
-
-  "width": 1920, "height": 1080, "fps": 30,
-  "font": "auto", "bitrate": "8M", "encoder": "auto",
-
+  "min_article_chars": 1200,
+  "max_queue": 6,
+  "privacy": "private",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "font": "auto",
+  "bitrate": "8M",
+  "encoder": "auto",
   "tts": "kokoro",
   "kokoro_voice": "am_eric",
   "piper_voice": "en_US-ryan-high",
   "speech_rate": 1.0,
   "sentence_silence": 0.45,
   "whisper_model": "base.en",
-  "youtube_category": "28"
+  "youtube_category": "28",
+  "sentence_gap": 0.28
 }

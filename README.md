@@ -324,6 +324,8 @@ To add a source of your own, write a function in `sources.py` returning `{title,
 
 Change `broll_queries` to match the subject or the footage will not fit the words.
 
+Make them visually different from each other, not just different words. Ten searches for server rooms, circuit boards, data centres and computer chips all return the same dark blue close up of electronics, and a viewer reads that as one clip repeating for eight minutes even though every one is a different file. Mix in people, daylight, streets and places. That does more for how a video feels than any encoder setting.
+
 ## Config
 
 | Key | What it does |
@@ -340,6 +342,7 @@ Change `broll_queries` to match the subject or the footage will not fit the word
 | `kokoro_voice` | Set it with `voices.py`. `am_eric` by default |
 | `piper_voice` | Used only when `tts` is `piper` |
 | `speech_rate` | Kokoro: above 1 is faster. Piper: above 1 is slower |
+| `sentence_gap` | Kokoro only. Silence inserted between sentences, in seconds |
 | `sentence_silence` | Piper only. Pause between sentences in seconds |
 | `bitrate` | `5M` is the default. `8M` looks slightly better and costs 60% more upload |
 | `encoder` | `auto` test-encodes a few frames and picks what works. Force with `h264_nvenc`, `h264_amf`, `h264_qsv` or `libx264` |

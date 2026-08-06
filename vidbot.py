@@ -311,16 +311,40 @@ def narrate(text, wav):
     return narrate_kokoro(text, wav)
 
 
+def sentences(text):
+    """Break a script into sentences, keeping the punctuation on the end."""
+    parts = re.split(r"(?<=[.!?])\s+", text.replace("\n", " ").strip())
+    return [p.strip() for p in parts if p.strip()]
+
+
 def narrate_kokoro(text, wav):
-    """Kokoro sounds markedly less synthetic than Piper for about twice the
-    compute. It splits long text itself, so a whole script goes in at once."""
-    import soundfile
-    samples, rate = kokoro().create(
-        text, voice=CFG.get("kokoro_voice", "am_eric"),
-        speed=CFG.get("speech_rate", 1.0), lang=CFG.get("kokoro_lang", "en-us"))
+    """One sentence at a time, joined with a short gap.
+
+    Handing Kokoro a whole script lets it cut the text into 510 phoneme
+    batches. It prefers punctuation, but on a long sentence it lands on a
+    comma, and every batch is spoken as though it were a whole sentence. So a
+    comma gets a falling tone and a full stop pause, three or four times a
+    video, at places no human would pause. Feeding it a sentence at a time
+    means every boundary is a real one.
+    """
+    import numpy, soundfile
+    voice = CFG.get("kokoro_voice", "am_eric")
+    speed = CFG.get("speech_rate", 1.0)
+    lang = CFG.get("kokoro_lang", "en-us")
+    gap = float(CFG.get("sentence_gap", 0.28))
+
+    engine, rate, chunks = kokoro(), None, []
+    for s in sentences(text):
+        samples, rate = engine.create(s, voice=voice, speed=speed, lang=lang)
+        chunks.append(samples)
+        chunks.append(numpy.zeros(int(rate * gap), dtype=samples.dtype))
+    if not chunks:
+        raise Unusable("nothing to narrate")
+
+    audio = numpy.concatenate(chunks[:-1])          # drop the trailing gap
     part = wav.with_suffix(".wav.part")
     # format has to be named, soundfile cannot guess it from a .part suffix
-    soundfile.write(str(part), samples, rate, format="WAV", subtype="PCM_16")
+    soundfile.write(str(part), audio, rate, format="WAV", subtype="PCM_16")
     part.replace(wav)
     return wav
 

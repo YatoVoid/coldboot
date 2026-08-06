@@ -2,7 +2,6 @@
   "niche": "video game industry news",
   "audience": "people who play games and follow the industry",
   "angle": "Say what happened, who it affects, and whether the outrage is proportionate. No console war bait.",
-
   "source": {
     "type": "rss",
     "feeds": [
@@ -12,27 +11,37 @@
     ],
     "limit": 40
   },
-
   "broll_queries": [
-    "gaming setup", "esports arena", "game controller", "neon arcade",
-    "computer keyboard rgb", "gaming pc build", "streamer studio",
-    "pixel art screen", "vr headset", "server room"
+    "gaming setup",
+    "esports arena",
+    "game controller",
+    "neon arcade",
+    "computer keyboard rgb",
+    "gaming pc build",
+    "streamer studio",
+    "pixel art screen",
+    "vr headset",
+    "server room"
   ],
   "broll_per_query": 4,
-
   "model": "qwen3:8b",
   "target_words": 1100,
   "videos_per_run": 2,
-  "min_article_chars": 1200, "max_queue": 6, "privacy": "private",
-
-  "width": 1920, "height": 1080, "fps": 30,
-  "font": "auto", "bitrate": "8M", "encoder": "auto",
-
+  "min_article_chars": 1200,
+  "max_queue": 6,
+  "privacy": "private",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "font": "auto",
+  "bitrate": "8M",
+  "encoder": "auto",
   "tts": "kokoro",
   "kokoro_voice": "am_eric",
   "piper_voice": "en_US-ryan-high",
   "speech_rate": 1.0,
   "sentence_silence": 0.45,
   "whisper_model": "base.en",
-  "youtube_category": "20"
+  "youtube_category": "20",
+  "sentence_gap": 0.28
 }

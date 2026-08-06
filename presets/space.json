@@ -2,7 +2,6 @@
   "niche": "space and astronomy",
   "audience": "people who like space but are not astronomers",
   "angle": "Explain the mission or the discovery plainly, including the parts that went wrong or are still unknown.",
-
   "source": {
     "type": "rss",
     "feeds": [
@@ -12,27 +11,37 @@
     ],
     "limit": 40
   },
-
   "broll_queries": [
-    "space stars", "galaxy nebula", "rocket launch", "earth from space",
-    "satellite orbit", "moon surface", "observatory telescope",
-    "mars landscape", "astronaut", "milky way timelapse"
+    "space stars",
+    "galaxy nebula",
+    "rocket launch",
+    "earth from space",
+    "satellite orbit",
+    "moon surface",
+    "observatory telescope",
+    "mars landscape",
+    "astronaut",
+    "milky way timelapse"
   ],
   "broll_per_query": 4,
-
   "model": "qwen3:8b",
   "target_words": 1250,
   "videos_per_run": 2,
-  "min_article_chars": 1200, "max_queue": 6, "privacy": "private",
-
-  "width": 1920, "height": 1080, "fps": 30,
-  "font": "auto", "bitrate": "8M", "encoder": "auto",
-
+  "min_article_chars": 1200,
+  "max_queue": 6,
+  "privacy": "private",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "font": "auto",
+  "bitrate": "8M",
+  "encoder": "auto",
   "tts": "kokoro",
   "kokoro_voice": "am_eric",
   "piper_voice": "en_US-ryan-high",
   "speech_rate": 1.0,
   "sentence_silence": 0.45,
   "whisper_model": "base.en",
-  "youtube_category": "28"
+  "youtube_category": "28",
+  "sentence_gap": 0.28
 }
